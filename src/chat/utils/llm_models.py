@@ -9,7 +9,6 @@ from langchain_openai import ChatOpenAI, AzureChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models import ChatOpenAI
 
-from src.chat.models.agent_model import AgentDefinition
 from src.common.config.app_config import get_application_config
 from src.common.service.logging.logger import error, info
 
