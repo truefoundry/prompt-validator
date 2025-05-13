@@ -2,7 +2,7 @@ assistants:
   get_recommendation:
     prompt_template_id: "chat_prompt:truefoundry/new-repo/get_recommendation:3"
   apply_recommendation:
-    prompt_template_id: "chat_prompt:truefoundry/new-repo/apply_recommendation:1"
+    prompt_template_id: "chat_prompt:truefoundry/new-repo/apply_recommendation:2"
   prompt_test_eval_recommendation:
     prompt_template_id: "chat_prompt:truefoundry/new-repo/verify_tests:1"
   prompt_test_eval_exact_recommendation:

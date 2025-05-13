@@ -31,15 +31,11 @@ in_memory_checkpointer = MemorySaver()
 
 async def validate_fn(state, prompt_to_validate):
     info("Entering validate_fn")
-    input_ = prompt_to_validate[0]['manifest']
-    info(f"manifest: {input_}")
     if not state['request']['recommendations']:
-    # if the recommendation list is empty
-        # Get prompt ID from config
-        prompt_template_id = CONFIG.get("assistants.get_recommendation.prompt_template_id")
+        return prompt_to_validate[0]['manifest'].messages
     else:
-        prompt_template_id = CONFIG.get("assistants.apply_recommendation.prompt_template_id")
-    return prompt_template_id, input_
+        return {"prompt_messages_list":prompt_to_validate[0]['manifest'].messages,
+                "recommendations": state['request']['recommendations']}
 
 async def validator(state: State):
     prompt_to_validate = await PromptService.get_prompt_details([state['request']['prompt_id']])
@@ -48,21 +44,27 @@ async def validator(state: State):
         return {"messages": ["Prompt not found"]}
 
     if state['request']['type'] == RequestType.VALIDATION.value:
-        prompt_template_id, input_ = await validate_fn(state, prompt_to_validate)
+        if not state['request']['recommendations']:
+        # if the recommendation list is empty
+            # Get prompt ID from config
+            prompt_template_id = CONFIG.get("assistants.get_recommendation.prompt_template_id")
+        else:
+            prompt_template_id = CONFIG.get("assistants.apply_recommendation.prompt_template_id")
+        input_ = await validate_fn(state, prompt_to_validate)
 
     elif state['request']['type'] == RequestType.VERIFY_TESTS.value:
         # Use DeepEval metrics for evaluation
+        prompt_template_id = CONFIG.get("assistants.prompt_test_eval_recommendation.prompt_template_id")
         evaluator = DeepEvalPromptEvaluator()
-        prompt_template_id, input_ = await evaluator.verify_tests(state)
+        input_ = await evaluator.verify_tests(state)
     
     elif state['request']['type'] == RequestType.VERIFY_TESTS_EXACT.value:
         # Use exact matching for evaluation
+        prompt_template_id = CONFIG.get("assistants.prompt_test_eval_exact_recommendation.prompt_template_id")
         evaluator = ExactMatchEvaluator()
-        prompt_template_id, input_ = await evaluator.verify_tests(state)
+        input_ = await evaluator.verify_tests(state)
 
     # Get prompt response
-    info(f"input str: {str(input_)}")
-    info(f"prompt_template_id: {prompt_template_id}")
     new_message = await PromptService.get_prompt_response(prompt_template_id, {'input': str(input_)})
     info(f"new_message: {new_message}")
     if state['request']['type'] in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:

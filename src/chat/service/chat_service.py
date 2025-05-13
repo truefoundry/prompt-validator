@@ -1,14 +1,14 @@
 import asyncio
 import traceback
 import json
-
+from typing import List
 from langchain_core.messages import AIMessage
 from langchain.output_parsers import PydanticOutputParser
 from langgraph.graph.graph import CompiledGraph
 from langgraph.types import StateSnapshot
 
 from src.chat.models.prompt_recommendation_request import PromptRecommendationRequest
-from src.chat.models.prompt_recommendation_response import PromptRecommendationResponse, Content, EvaluationResult
+from src.chat.models.prompt_recommendation_response import PromptRecommendationResponse, Content, EvaluationResult, PromptMessageList
 from src.chat.utils.constants import RequestType
 from src.chat.utils.chat_utils import print_event
 # from src.chat.utils.langfuse_handler_util import LangfuseHandler
@@ -195,7 +195,7 @@ async def _process_events_and_build_response(request, events, graph, configurati
             ),
             prompt_id=request.prompt_id
         )
-    eval_result, prompt_result, pre_validation_result, test_case_result, test_evaluation_result = None, None, None, None, None
+    eval_result, prompt_result, test_evaluation_result = None, None, None
     # Return the last message from the graph, usually for Uninterrupted flows
     if request.type == RequestType.VALIDATION.value:
         if not request.recommendations:
@@ -205,7 +205,11 @@ async def _process_events_and_build_response(request, events, graph, configurati
             except Exception as e:
                 error(f"Error parsing output: {e}")
         else:
-            prompt_result = last_message
+            try:
+                parser = PydanticOutputParser(pydantic_object=PromptMessageList)
+                prompt_result = parser.parse(last_message)
+            except Exception as e:
+                error(f"Error parsing output: {e}")
     elif request.type in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:
         test_evaluation_result = json.loads(last_message)
 

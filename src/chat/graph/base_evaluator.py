@@ -63,5 +63,4 @@ class PromptEvaluator(ABC):
         # Generate final report
         report = self.get_final_report(all_tests, evaluation_results)
         
-        prompt_template_id = self.config.get("assistants.prompt_test_eval_recommendation.prompt_template_id")
-        return prompt_template_id, report 
+        return report 

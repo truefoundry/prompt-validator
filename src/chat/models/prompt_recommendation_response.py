@@ -26,12 +26,26 @@ class EvaluationResult(BaseModel):
     explanations: Explanations = Field(..., description="The explanation of the score for each criteria.")
     recommendations: List[str] = Field(..., description="The list of recommendations in order to improve the prompt.")
 
+class PromptMessage(BaseModel):
+    role: str = Field(..., description="The role of the message.")
+    content: str = Field(..., description="The content of the message.")
+
+class PromptMessageList(BaseModel):
+    prompt_messages_list: List[PromptMessage] = Field(..., description="The list of prompt messages.")
+
+    @model_validator(mode='before')
+    @classmethod
+    def validate_input(cls, data):
+        if isinstance(data, list):
+            return {"prompt_messages_list": data}
+        return data
+
 class Content(BaseModel):
     """
     Response from the agent.
     """
     eval_result: Optional[EvaluationResult] = Field(..., description="The result of prompt evaluation.")
-    final_prompt_result: Optional[str] = Field(..., description="The result of incorporating recommendations into the prompt.")
+    final_prompt_result: Optional[PromptMessageList]= Field(..., description="The result of incorporating recommendations into the prompt.")
     test_evaluation_result: Optional[dict] = Field(..., description="The evaluation result for the test cases.")
     class Config:
         alias_generator = to_camel

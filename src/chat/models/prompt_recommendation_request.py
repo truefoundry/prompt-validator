@@ -15,5 +15,3 @@ class PromptRecommendationRequest(BaseModel):
     )
     type: str = Field(..., description="The type of input request")
     recommendations: Optional[List[str]] = Field(..., description="The list of recommendations for each section in order to improve the prompt.")
-    data: Optional[dict] = Field(..., description="The data input required in the prompt.")
-    additionalData: Optional[dict] = Field(..., description="Additional data required to generate prompt results.")

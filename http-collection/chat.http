@@ -9,13 +9,11 @@ x-grid: 8091
   "sessionId": "123",
   "promptId": "chat_prompt:truefoundry/new-repo/tutor_prompt:1",
   "type": "validation",
-  "recommendations": null,
-  "data": null,
-  "additionalData": null
+  "recommendations": null
 }
 
 ### Step 2: Get the updated prompt after applying recommendations
-POST {{url}}/microservices/x42-prompt-validator/v1/chat
+POST {{url}}/chat
 Content-Type: application/json
 
 {
@@ -23,11 +21,9 @@ Content-Type: application/json
   "promptId": "chat_prompt:truefoundry/new-repo/tutor_prompt:1",
   "type": "validation",
   "recommendations": [
-          "Consider adding a sentence or two elaborating on the importance of accurate date extraction in a pharmaceutical context (e.g., medication safety, patient records).",
-          "Reiterate the importance of handling Personally Identifiable Information (PII) with care and in compliance with privacy regulations."
-        ],
-  "data": null,
-  "additionalData": null
+        "Provide instructions for handling ambiguous or incomplete inputs.",
+        "Clarify any constraints on the explanation style, such as technical depth or language simplicity."
+        ]
 }
 
 ### Step 5: Verify the test cases for a prompt
@@ -39,9 +35,7 @@ x-grid: 8091
   "sessionId": "123",
   "promptId": "chat_prompt:truefoundry/new-repo/tutor_prompt:1",
   "type": "verify_tests",
-  "recommendations": null,
-  "data": null,
-  "additionalData": null
+  "recommendations": null
 }
 
 ### Step 5 for exact match: Verify test cases for exact match functionality
@@ -53,7 +47,5 @@ x-grid: 8091
   "sessionId": "123",
   "promptId": "chat_prompt:truefoundry/new-repo/tutor_prompt:1",
   "type": "verify_tests",
-  "recommendations": null,
-  "data": null,
-  "additionalData": null
+  "recommendations": null
 }
