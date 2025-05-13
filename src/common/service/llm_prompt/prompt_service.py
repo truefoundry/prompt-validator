@@ -90,9 +90,10 @@ class PromptService:
             info(f"messages: {messages}")
             # Get LLM and invoke
             llm = get_truefoundry_llm()
-            response = await llm.invoke(messages)
-            info(f"Response: {response}")
-            return {"response": str(response.content)}
+            response = await llm.ainvoke(messages)
+            info(f"Type Response: {type(response)}")
+            info(f"Response: {response.__dict__}")
+            return response.__dict__
 
         except Exception as e:
             error(f"Error getting prompt response: {e}")

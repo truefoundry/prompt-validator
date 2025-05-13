@@ -68,7 +68,7 @@ async def validator(state: State):
     if state['request']['type'] in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:
         new_message = AIMessage(json.dumps({"results": input_, "recommendation_result": new_message['content']}))
     else:
-        new_message = new_message['content']
+        new_message = AIMessage(new_message['content'])
     return {"messages": [new_message]}
 
 
