@@ -6,6 +6,7 @@ import csv
 import os
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
+from truefoundry.ml import ArtifactPath
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
@@ -68,7 +69,14 @@ async def validator(state: State):
     new_message = await PromptService.get_prompt_response(prompt_template_id, {'input': str(input_)})
     info(f"new_message: {new_message}")
     if state['request']['type'] in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:
-        new_message = AIMessage(json.dumps({"results": input_, "recommendation_result": new_message}))
+        response_json = {"results": input_, "recommendation_result": new_message}
+        new_message = AIMessage(json.dumps(response_json))
+        with open("src/chat/data/test_results/test_results.json", "w") as f:
+            json.dump(response_json, f)
+        evaluator.tf_client.log_artifact(
+            ml_repo=CONFIG.get("application_details.ml_repo"),
+            name=f"{state['request']['prompt_fqn'].split("/")[-1].split(":")[0]}_test_results",
+            artifact_paths=[ArtifactPath(src="src/chat/data/test_results/test_results.json", dest="test_results.json")])
     else:
         new_message = AIMessage(new_message)
     return {"messages": [new_message]}

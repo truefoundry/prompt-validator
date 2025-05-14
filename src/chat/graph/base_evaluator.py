@@ -23,8 +23,6 @@ class PromptEvaluator(ABC):
             ml_repo = self.config.get('application_details.ml_repo')
             artifact_version = self.tf_client.get_artifact_version(ml_repo=ml_repo, name=f"{prompt_name}_tests")
             info(f"Version: {artifact_version}")
-            # artifact_version = self.tf_client.get_artifact_version_by_fqn(artifact_version.fqn)
-            # info(f"Artifact version: {artifact_version}")
             # download it to disk
             # `download_path` points to a directory that has all contents of the artifact
             download_path = artifact_version.download(path="src/chat/data/test_cases/", overwrite=True)
