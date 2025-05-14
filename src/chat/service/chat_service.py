@@ -133,7 +133,7 @@ def _get_graph_configuration(request: PromptRecommendationRequest) -> dict:
         # else [],
         "configurable": {
             "thread_id": request.session_id,
-            "prompt_id": request.prompt_id
+            "prompt_fqn": request.prompt_fqn
         },
         "recursion_limit": 15,
     }
@@ -151,7 +151,7 @@ async def _resume_a_new_conversation(request, configuration, graph):
     """
     events = []
     async for event in graph.astream(  # Changed from stream to astream
-        {"messages": ("user", request.prompt_id), "request": request.model_dump()},
+        {"messages": ("user", request.prompt_fqn), "request": request.model_dump()},
         config=configuration,
         stream_mode="values",
     ):
@@ -193,7 +193,7 @@ async def _process_events_and_build_response(request, events, graph, configurati
                 final_prompt_result=None,
                 test_evaluation_result=None
             ),
-            prompt_id=request.prompt_id
+            prompt_fqn=request.prompt_fqn
         )
     eval_result, prompt_result, test_evaluation_result = None, None, None
     # Return the last message from the graph, usually for Uninterrupted flows
@@ -222,5 +222,5 @@ async def _process_events_and_build_response(request, events, graph, configurati
             final_prompt_result=prompt_result,
             test_evaluation_result=test_evaluation_result
         ),
-        prompt_id=request.prompt_id
+        prompt_fqn=request.prompt_fqn
     )

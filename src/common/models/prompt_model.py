@@ -20,7 +20,7 @@ class PromptDetail(BaseModel):
         except (base64.binascii.Error, UnicodeDecodeError) as e:
             error(f"Error decoding prompt: {e}")
 
-    promptId: str
+    promptFQN: str
     model: str
     provider: str
     prompt: str

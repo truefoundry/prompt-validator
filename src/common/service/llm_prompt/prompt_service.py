@@ -76,7 +76,6 @@ class PromptService:
 
             # Render prompt with variables
             rendered_prompt = render_prompt(prompt_template, variables=data)
-            info(f"Rendered prompt: {rendered_prompt['messages']}")
             
             # Convert messages to LangChain message types
             messages: List[BaseMessage] = []
@@ -87,13 +86,10 @@ class PromptService:
                     messages.append(HumanMessage(content=msg['content']))
                 elif msg['role'] == 'assistant':
                     messages.append(AIMessage(content=msg['content']))
-            info(f"messages: {messages}")
             # Get LLM and invoke
             llm = get_truefoundry_llm()
             response = await llm.ainvoke(messages)
-            info(f"Type Response: {type(response)}")
-            info(f"Response: {response.__dict__}")
-            return response.__dict__
+            return response.content
 
         except Exception as e:
             error(f"Error getting prompt response: {e}")

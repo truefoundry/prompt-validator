@@ -6,7 +6,6 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models import ChatOpenAI
 
 from src.chat.graph.base_evaluator import PromptEvaluator
-from src.chat.utils.llm_models import AzureOpenAI
 from src.chat.utils.llm_models import get_truefoundry_llm
 from src.common.service.logging.logger import info
 
@@ -45,6 +44,7 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
         )
 
         rag_metrics = []
+        """
         if is_rag:
             context_precision = ContextualPrecisionMetric(
                 model=custom_llm, 
@@ -52,6 +52,7 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
                 async_mode=False
             )
             rag_metrics = [context_precision]
+        """
 
         return [correctness_metric, toxicity_metric, bias_metric] + rag_metrics
     
@@ -59,6 +60,8 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
         """Evaluate tests using DeepEval metrics."""
         # Get all metrics
         all_metrics = await self.get_all_metrics(is_rag)
+        info(f"All metrics: {all_metrics}")
+
         llm_test_cases = list()
         for test_case in all_tests:
             if is_rag:
@@ -79,7 +82,10 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
                         )
                     )
 
+        info("LLM test cases created.")
+
         result = evaluate(llm_test_cases, all_metrics, ignore_errors=True)
+        info("Evaluation completed.")
         test_results = result.test_results
         test_results.sort(key=lambda x: int(x.name.split("_")[-1]))
 

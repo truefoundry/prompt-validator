@@ -6,6 +6,7 @@ from typing import Dict, Tuple, Any
 
 from langchain_google_vertexai import ChatVertexAI
 from langchain_openai.chat_models.base import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models import ChatOpenAI
 
@@ -24,22 +25,6 @@ def get_truefoundry_llm():
         openai_api_key=os.getenv("TFY_API_KEY"),
         base_url=os.getenv("LLM_BASE_URL"),
     )
-"""
-    return ChatOpenAI(
-        model="openai-main/o3-mini",
-        temperature=0.7,
-        max_tokens=256,
-        model_kwargs={
-            "top_p": 0.8
-        },
-        streaming=True,
-        api_key=os.getenv("TRUEFOUNDRY_API_KEY"),
-        base_url="https://internal.devtest.truefoundry.tech/api/llm/api/inference/openai",
-        extra_headers={
-            "X-TFY-METADATA": '{"tfy_log_request":"true"}',
-        }
-    )
-    """
 
 class AzureOpenAI(DeepEvalBaseLLM):
     """

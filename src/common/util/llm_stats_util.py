@@ -133,7 +133,7 @@ def _log_tool_usage_stats(
     """
     Log the tool usage stats. This function is called when the message is a tool response.
     The function definition is available in the selected tools.
-    Example - promptId, promptDescription, prompt, functionParameters, functionProvider, functionModel.
+    Example - promptFQN, promptDescription, prompt, functionParameters, functionProvider, functionModel.
     The AI result comprises the LLM usage metadata and tool calls.
     Example - input_tokens, output_tokens, total_tokens, name, args, id, type.
     Merge the selected tool and AI result to build the LLM stats object.
@@ -182,7 +182,7 @@ def _log_tool_usage_stats(
             input_token_size=input_tokens,
             output_token_size=output_tokens,
             total_tokens=total_tokens,
-            prompt_id=selected_tool.get("functionId", ""),
+            prompt_fqn=selected_tool.get("functionId", ""),
             prompt_short_description=selected_tool.get("functionDescription", ""),
             generated_prompt=selected_tool.get("functionPrompt", ""),
             additional_data=None,
@@ -194,7 +194,7 @@ def _log_tool_usage_stats(
             answer=tool_call,
         )
 
-        add_llm_execution_stats({llm_stats.prompt_id: llm_stats})
+        add_llm_execution_stats({llm_stats.prompt_fqn: llm_stats})
 
 
 def _log_prompt_usage_stats(
@@ -241,7 +241,7 @@ def _log_prompt_usage_stats(
         input_token_size=input_tokens,
         output_token_size=output_tokens,
         total_tokens=total_tokens,
-        prompt_id=selected_prompt.get("promptId", ""),
+        prompt_fqn=selected_prompt.get("promptFQN", ""),
         prompt_short_description=selected_prompt.get("promptDescription", ""),
         generated_prompt=selected_prompt.get("prompt", ""),
         additional_data=None,
@@ -253,4 +253,4 @@ def _log_prompt_usage_stats(
         answer=msg.content,
     )
 
-    add_llm_execution_stats({llm_stats.prompt_id: llm_stats})
+    add_llm_execution_stats({llm_stats.prompt_fqn: llm_stats})

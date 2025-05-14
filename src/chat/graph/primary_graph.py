@@ -38,7 +38,7 @@ async def validate_fn(state, prompt_to_validate):
                 "recommendations": state['request']['recommendations']}
 
 async def validator(state: State):
-    prompt_to_validate = await PromptService.get_prompt_details([state['request']['prompt_id']])
+    prompt_to_validate = await PromptService.get_prompt_details([state['request']['prompt_fqn']])
     # If the prompt was not found
     if not prompt_to_validate:
         return {"messages": ["Prompt not found"]}
@@ -68,9 +68,9 @@ async def validator(state: State):
     new_message = await PromptService.get_prompt_response(prompt_template_id, {'input': str(input_)})
     info(f"new_message: {new_message}")
     if state['request']['type'] in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:
-        new_message = AIMessage(json.dumps({"results": input_, "recommendation_result": new_message['content']}))
+        new_message = AIMessage(json.dumps({"results": input_, "recommendation_result": new_message}))
     else:
-        new_message = AIMessage(new_message['content'])
+        new_message = AIMessage(new_message)
     return {"messages": [new_message]}
 
 
