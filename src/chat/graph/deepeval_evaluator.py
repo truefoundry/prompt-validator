@@ -1,12 +1,14 @@
 from deepeval.metrics import ContextualPrecisionMetric, ToxicityMetric, BiasMetric, GEval
 from deepeval.test_case import LLMTestCaseParams, LLMTestCase
 from deepeval import evaluate
+from deepeval.evaluate import ErrorConfig
 import os
 from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models import ChatOpenAI
 
 from src.chat.graph.base_evaluator import PromptEvaluator
 from src.chat.utils.llm_models import get_truefoundry_llm
+from langchain_openai import AzureChatOpenAI
 from src.common.service.logging.logger import info
 
 class DeepEvalPromptEvaluator(PromptEvaluator):
@@ -15,11 +17,10 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
     async def get_all_metrics(self, is_rag):
         """Get all DeepEval metrics."""
         # get the llm to be used as judge
-        custom_llm = get_truefoundry_llm()
+        # custom_llm = AzureChatOpenAI(get_truefoundry_llm())
 
         # Define the different metrics
         correctness_metric = GEval(
-            model=custom_llm,
             name="Correctness",
             criteria="Determine whether the actual output is factually correct based on the expected output.",
             evaluation_steps=[
@@ -32,13 +33,11 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
         )
         
         toxicity_metric = ToxicityMetric(
-            model=custom_llm, 
             threshold=self.config.get("metrics.prompt_metrics.toxicity_metric.threshold"), 
             async_mode=False
         ) 
         
         bias_metric = BiasMetric(
-            model=custom_llm, 
             threshold=self.config.get("metrics.prompt_metrics.bias_metric.threshold"), 
             async_mode=False
         )
@@ -54,7 +53,9 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
             rag_metrics = [context_precision]
         """
 
-        return [correctness_metric, toxicity_metric, bias_metric] + rag_metrics
+        return [(correctness_metric, correctness_metric.__name__),
+                (toxicity_metric, "Toxicity"),
+                (bias_metric, "Bias")] + rag_metrics
     
     async def evaluate_tests(self, all_tests, is_rag=False):
         """Evaluate tests using DeepEval metrics."""
@@ -64,6 +65,7 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
 
         llm_test_cases = list()
         for test_case in all_tests:
+            """
             if is_rag:
                 llm_test_cases.append(
                     LLMTestCase(
@@ -74,17 +76,19 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
                         )
                     )
             else:
-                llm_test_cases.append(
-                    LLMTestCase(
-                        input=test_case["input"],
-                        actual_output=test_case["actual_output"],
-                        expected_output=test_case["expected_output"]
-                        )
+            """
+            llm_test_cases.append(
+                LLMTestCase(
+                    input=test_case["data"]["input"],
+                    actual_output=test_case["actual_output"],
+                    expected_output=test_case["expected_output"]
                     )
+                )
 
         info("LLM test cases created.")
 
-        result = evaluate(llm_test_cases, all_metrics, ignore_errors=True)
+        error_config = ErrorConfig(ignore_errors=True)
+        result = evaluate(llm_test_cases, [m[0] for m in all_metrics], error_config=error_config)
         info("Evaluation completed.")
         test_results = result.test_results
         test_results.sort(key=lambda x: int(x.name.split("_")[-1]))
@@ -93,16 +97,14 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
         for test_case, result in zip(all_tests, test_results):
             metric_values = dict()
             pass_status = True
-            for metric in result.metrics_data:
-                info(f"metric: {metric}")
+            for name, metric in zip([m[1] for m in all_metrics], result.metrics_data):
                 pass_status = pass_status and metric.success
-                metric_values[metric.__name__] = {
+                metric_values[name] = {
                     "score": metric.score,
                     "reason": metric.reason,
                     "threshold": metric.threshold,
                     "success": metric.success
                 }
-            info(f"metric_values: {metric_values}")
             evaluation_results.append({
                             "test_case_id": test_case.get('test_case_id'),
                             "input": test_case.get("input"),

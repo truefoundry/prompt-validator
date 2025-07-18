@@ -10,7 +10,6 @@ from truefoundry.ml import ArtifactPath
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from langgraph.graph.graph import CompiledGraph
 from langchain_core.messages import AIMessage
 from langchain.output_parsers import PydanticOutputParser
 from openai import OpenAI
@@ -83,7 +82,7 @@ async def validator(state: State):
 
 
 @method_exec_stats
-async def _build_state_graph(request: PromptRecommendationRequest) -> Optional[CompiledGraph]:
+async def _build_state_graph(request: PromptRecommendationRequest):
     """Build and compile the state graph with all configured agents.
 
     Returns:

@@ -5,8 +5,10 @@ from time import perf_counter
 from typing import Dict, Tuple, Any
 
 from langchain_google_vertexai import ChatVertexAI
-from langchain_openai import AzureChatOpenAI , ChatOpenAI
+from langchain_openai.chat_models.base import ChatOpenAI
+from langchain_openai import AzureChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
+# from langchain_community.chat_models import ChatOpenAI
 
 from src.common.config.app_config import get_application_config
 from src.common.service.logging.logger import error, info
@@ -16,15 +18,13 @@ CONFIG = get_application_config()
 
 def get_truefoundry_llm():
     return ChatOpenAI(
-        model="openai-main/o3-mini",
-        streaming=True,
-        api_key=os.getenv("TFY_API_KEY"), 
-        base_url=os.getenv("GATEWAY_URL"),
-        extra_headers   =  {
-            "X-TFY-METADATA": '{"tfy_log_request":"true"}',
-        }
+        model="openai-main/gpt-4o",
+        temperature=0.1,
+        max_tokens=2500,
+        streaming=False,
+        openai_api_key=os.getenv("TFY_API_KEY"),
+        base_url=os.getenv("LLM_BASE_URL"),
     )
-
 
 class AzureOpenAI(DeepEvalBaseLLM):
     """

@@ -7,7 +7,7 @@ x-grid: 8091
 
 {
   "sessionId": "123",
-  "promptFQN": "chat_prompt:truefoundry/new-repo/tutor_prompt:1",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_guardrails_prompt:1",
   "type": "validation",
   "recommendations": null
 }
@@ -18,11 +18,10 @@ Content-Type: application/json
 
 {
   "sessionId": "123",
-  "promptFQN": "chat_prompt:truefoundry/new-repo/tutor_prompt:1",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_guardrails_prompt:1",
   "type": "validation",
   "recommendations": [
-        "Provide instructions for handling ambiguous or incomplete inputs.",
-        "Clarify any constraints on the explanation style, such as technical depth or language simplicity."
+        "Simplify and condense the prompt to improve readability and comprehension."
         ]
 }
 

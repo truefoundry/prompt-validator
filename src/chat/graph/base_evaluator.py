@@ -60,7 +60,6 @@ class PromptEvaluator(ABC):
         """Main method to verify tests using the specific evaluation strategy."""
         # Get prompt details
         prompt_fqn = state['request']['prompt_fqn']
-        prompt_detail = await PromptService.get_prompt_details([prompt_fqn])
 
         # Get all test cases
         all_tests = await self.get_all_tests_db(prompt_fqn)

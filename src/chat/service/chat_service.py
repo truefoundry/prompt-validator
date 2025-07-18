@@ -4,7 +4,6 @@ import json
 from typing import List
 from langchain_core.messages import AIMessage
 from langchain.output_parsers import PydanticOutputParser
-from langgraph.graph.graph import CompiledGraph
 from langgraph.types import StateSnapshot
 
 from src.chat.models.prompt_recommendation_request import PromptRecommendationRequest
@@ -68,7 +67,7 @@ class ChatService:
         """
         try:
             # Build the state graph
-            graph: CompiledGraph = await _build_state_graph(request)
+            graph = await _build_state_graph(request)
 
             # Graph Configuration
             configuration = _get_graph_configuration(request)
