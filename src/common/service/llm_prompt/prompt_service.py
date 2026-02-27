@@ -41,6 +41,7 @@ class PromptService:
                 prompt_version_response = client.prompt_versions.get_by_fqn(fqn=fqn)
                 prompt_template = prompt_version_response.data
                 prompt_details.append(prompt_template.__dict__)
+                
             return prompt_details
 
         except Exception as e:
@@ -53,6 +54,8 @@ class PromptService:
     async def get_prompt_response(
         prompt_fqn: str,
         data: Dict[str, Any],
+        model_name: Optional[str] = None,
+        response_schema: Optional[Dict[str, Any]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Fetches LLM response for a given prompt and input using TrueFoundry client and LLM.
@@ -70,6 +73,7 @@ class PromptService:
             raise HTTPException(status_code=400, detail="prompt_fqn is required")
 
         try:
+            info(f"PromptService request model_name: {model_name}")
             # Get prompt template
             prompt_version_response = client.prompt_versions.get_by_fqn(fqn=prompt_fqn)
             prompt_template = prompt_version_response.data.manifest
@@ -87,7 +91,7 @@ class PromptService:
                 elif msg['role'] == 'assistant':
                     messages.append(AIMessage(content=msg['content']))
             # Get LLM and invoke
-            llm = get_truefoundry_llm()
+            llm = get_truefoundry_llm(model_name=model_name, response_schema=response_schema)
             response = await llm.ainvoke(messages)
             return response.content
 

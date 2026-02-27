@@ -1,10 +1,12 @@
 import asyncio
 import traceback
 import json
-from typing import List
+import re
+from typing import List, Type
 from langchain_core.messages import AIMessage
 from langchain.output_parsers import PydanticOutputParser
 from langgraph.types import StateSnapshot
+from pydantic import BaseModel
 
 from src.chat.models.prompt_recommendation_request import PromptRecommendationRequest
 from src.chat.models.prompt_recommendation_response import PromptRecommendationResponse, Content, EvaluationResult, PromptMessageList
@@ -16,6 +18,35 @@ from src.common.config.app_config import get_application_config
 from src.common.service.logging.logger import error, info
 
 CONFIG = get_application_config()
+
+
+def _sanitize_json_like_output(raw_text: str) -> str:
+    """Sanitize common LLM JSON formatting issues before parsing."""
+    sanitized = raw_text.strip()
+
+    # Remove fenced markdown blocks like ```json ... ```
+    sanitized = re.sub(r"^\s*```(?:json)?\s*", "", sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r"\s*```\s*$", "", sanitized)
+
+    # Remove trailing commas before closing objects/arrays.
+    sanitized = re.sub(r",\s*([}\]])", r"\1", sanitized)
+    return sanitized.strip()
+
+
+def _parse_with_sanitizer(raw_text: str, model_cls: Type[BaseModel]) -> BaseModel | None:
+    """Parse model output with strict parser first, then sanitized JSON fallback."""
+    parser = PydanticOutputParser(pydantic_object=model_cls)
+    try:
+        return parser.parse(raw_text)
+    except Exception as primary_error:
+        try:
+            sanitized = _sanitize_json_like_output(raw_text)
+            parsed_json = json.loads(sanitized)
+            return model_cls.model_validate(parsed_json)
+        except Exception as fallback_error:
+            error(f"Error parsing output: {primary_error}")
+            error(f"Fallback parsing failed after sanitization: {fallback_error}")
+            return None
 
 
 async def _get_last_ai_message(events):
@@ -198,19 +229,18 @@ async def _process_events_and_build_response(request, events, graph, configurati
     # Return the last message from the graph, usually for Uninterrupted flows
     if request.type == RequestType.VALIDATION.value:
         if not request.recommendations:
-            try:
-                parser = PydanticOutputParser(pydantic_object=EvaluationResult)
-                eval_result = parser.parse(last_message)
-            except Exception as e:
-                error(f"Error parsing output: {e}")
+            eval_result = _parse_with_sanitizer(last_message, EvaluationResult)
         else:
-            try:
-                parser = PydanticOutputParser(pydantic_object=PromptMessageList)
-                prompt_result = parser.parse(last_message)
-            except Exception as e:
-                error(f"Error parsing output: {e}")
+            prompt_result = _parse_with_sanitizer(last_message, PromptMessageList)
     elif request.type in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:
-        test_evaluation_result = json.loads(last_message)
+        try:
+            test_evaluation_result = json.loads(last_message)
+        except Exception:
+            try:
+                test_evaluation_result = json.loads(_sanitize_json_like_output(last_message))
+            except Exception as e:
+                error(f"Error parsing test evaluation result: {e}")
+                test_evaluation_result = None
 
     return PromptRecommendationResponse(
         session_id=request.session_id,

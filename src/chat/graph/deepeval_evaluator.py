@@ -7,7 +7,7 @@ from langchain.schema import HumanMessage, SystemMessage
 from langchain_community.chat_models import ChatOpenAI
 
 from src.chat.graph.base_evaluator import PromptEvaluator
-from src.chat.utils.llm_models import get_truefoundry_llm
+from src.chat.utils.llm_models import TrueFoundryLLM, get_truefoundry_llm
 from langchain_openai import AzureChatOpenAI
 from src.common.service.logging.logger import info
 
@@ -16,8 +16,8 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
     
     async def get_all_metrics(self, is_rag):
         """Get all DeepEval metrics."""
-        # get the llm to be used as judge
-        # custom_llm = AzureChatOpenAI(get_truefoundry_llm())
+        # get the llm to be used as judge - use TrueFoundry LLM wrapped in DeepEval adapter
+        custom_llm = TrueFoundryLLM(model=get_truefoundry_llm(self.model_name))
 
         # Define the different metrics
         correctness_metric = GEval(
@@ -29,21 +29,23 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
             ],
             evaluation_params=[LLMTestCaseParams.INPUT, LLMTestCaseParams.ACTUAL_OUTPUT, LLMTestCaseParams.EXPECTED_OUTPUT],
             threshold=self.config.get("metrics.prompt_metrics.correctness_geval.threshold"),
+            model=custom_llm,
             async_mode=False
         )
         
         toxicity_metric = ToxicityMetric(
+            model=custom_llm,
             threshold=self.config.get("metrics.prompt_metrics.toxicity_metric.threshold"), 
             async_mode=False
         ) 
         
         bias_metric = BiasMetric(
+            model=custom_llm,
             threshold=self.config.get("metrics.prompt_metrics.bias_metric.threshold"), 
             async_mode=False
         )
 
         rag_metrics = []
-        """
         if is_rag:
             context_precision = ContextualPrecisionMetric(
                 model=custom_llm, 
@@ -51,7 +53,6 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
                 async_mode=False
             )
             rag_metrics = [context_precision]
-        """
 
         return [(correctness_metric, correctness_metric.__name__),
                 (toxicity_metric, "Toxicity"),
@@ -107,7 +108,12 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
                 }
             evaluation_results.append({
                             "test_case_id": test_case.get('test_case_id'),
-                            "input": test_case.get("input"),
+                            "test_case_name": test_case.get("test_case_name", ""),
+                            "input": (
+                                test_case.get("input")
+                                or test_case.get("data", {}).get("input", "")
+                                or test_case.get("test_case_name", "")
+                            ),
                             "actual_output": test_case.get("actual_output"),
                             "expected_output": test_case.get("expected_output"),
                             "scenario": test_case.get("scenario"),

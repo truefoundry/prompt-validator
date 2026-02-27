@@ -17,6 +17,7 @@ from openai import OpenAI
 from src.chat.models.state_model import State
 from src.chat.models.prompt_recommendation_request import PromptRecommendationRequest
 from src.chat.utils.constants import RequestType
+from src.chat.utils.llm_models import get_recommendation_response_schema
 from src.chat.utils.checkpointer_factory_util import CheckpointerFactory
 from src.common.config.app_config import get_application_config
 from src.common.util.method_stats_util import method_exec_stats
@@ -43,11 +44,13 @@ async def validator(state: State):
     if not prompt_to_validate:
         return {"messages": ["Prompt not found"]}
 
+    response_schema = None
     if state['request']['type'] == RequestType.VALIDATION.value:
         if not state['request']['recommendations']:
         # if the recommendation list is empty
             # Get prompt ID from config
             prompt_template_id = CONFIG.get("assistants.get_recommendation.prompt_template_id")
+            response_schema = get_recommendation_response_schema()
         else:
             prompt_template_id = CONFIG.get("assistants.apply_recommendation.prompt_template_id")
         input_ = await validate_fn(state, prompt_to_validate)
@@ -55,26 +58,32 @@ async def validator(state: State):
     elif state['request']['type'] == RequestType.VERIFY_TESTS.value:
         # Use DeepEval metrics for evaluation
         prompt_template_id = CONFIG.get("assistants.prompt_test_eval_recommendation.prompt_template_id")
-        evaluator = DeepEvalPromptEvaluator()
+        evaluator = DeepEvalPromptEvaluator(model_name=state["request"].get("model_name"))
         input_ = await evaluator.verify_tests(state)
     
     elif state['request']['type'] == RequestType.VERIFY_TESTS_EXACT.value:
         # Use exact matching for evaluation
         prompt_template_id = CONFIG.get("assistants.prompt_test_eval_exact_recommendation.prompt_template_id")
-        evaluator = ExactMatchEvaluator()
+        evaluator = ExactMatchEvaluator(model_name=state["request"].get("model_name"))
         input_ = await evaluator.verify_tests(state)
 
     # Get prompt response
-    new_message = await PromptService.get_prompt_response(prompt_template_id, {'input': str(input_)})
+    new_message = await PromptService.get_prompt_response(
+        prompt_template_id,
+        {"input": str(input_)},
+        model_name=state["request"].get("model_name"),
+        response_schema=response_schema,
+    )
     info(f"new_message: {new_message}")
     if state['request']['type'] in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:
         response_json = {"results": input_, "recommendation_result": new_message}
         new_message = AIMessage(json.dumps(response_json))
         with open("src/chat/data/test_results/test_results.json", "w") as f:
             json.dump(response_json, f)
+        prompt_slug = state["request"]["prompt_fqn"].split("/")[-1].split(":")[0]
         evaluator.tf_client.log_artifact(
             ml_repo=CONFIG.get("application_details.ml_repo"),
-            name=f"{state['request']['prompt_fqn'].split("/")[-1].split(":")[0]}_test_results",
+            name=f"{prompt_slug}_test_results",
             artifact_paths=[ArtifactPath(src="src/chat/data/test_results/test_results.json", dest="test_results.json")])
     else:
         new_message = AIMessage(new_message)

@@ -11,9 +11,10 @@ from src.common.service.logging.logger import error, info
 class PromptEvaluator(ABC):
     """Base class for prompt evaluation strategies."""
     
-    def __init__(self):
+    def __init__(self, model_name: str | None = None):
         self.config = get_application_config()
         self.tf_client = get_client()
+        self.model_name = model_name
     
     async def get_all_tests_db(self, prompt_fqn):
         """Fetch test cases from the truefoundry artifact."""
@@ -36,7 +37,11 @@ class PromptEvaluator(ABC):
     async def get_test_responses(self, prompt_fqn, all_tests):
         """Get responses for all test cases in parallel."""
         async def get_single_response(test):
-            response = await PromptService.get_prompt_response(prompt_fqn=prompt_fqn, data=test["data"])
+            response = await PromptService.get_prompt_response(
+                prompt_fqn=prompt_fqn,
+                data=test["data"],
+                model_name=self.model_name,
+            )
             test["actual_output"] = response
             return test
 
@@ -61,9 +66,14 @@ class PromptEvaluator(ABC):
         # Get prompt details
         prompt_fqn = state['request']['prompt_fqn']
 
-        # Get all test cases
-        all_tests = await self.get_all_tests_db(prompt_fqn)
-        all_tests = all_tests[:10]
+        # Use provided test cases if supplied, otherwise fetch from TrueFoundry
+        provided_tests = state['request'].get('test_cases')
+        if provided_tests:
+            all_tests = provided_tests
+            info(f"Using {len(all_tests)} test cases from request payload.")
+        else:
+            all_tests = await self.get_all_tests_db(prompt_fqn)
+            all_tests = all_tests[:10]
         info(f"Number of test cases created: {len(all_tests)}")
         
         # Get all actual outputs

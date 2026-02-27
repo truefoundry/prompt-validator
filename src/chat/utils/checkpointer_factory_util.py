@@ -1,5 +1,3 @@
-from langgraph.checkpoint.postgres import PostgresSaver
-
 from src.chat.utils.redis_async_checkpointer_util import AsyncRedisSaver
 from src.common.config.app_config import get_application_config
 from src.common.service.logging.logger import info
@@ -37,6 +35,9 @@ class CheckpointerFactory:
     async def _create_postgres_saver():
         """Creates a Postgres saver instance."""
         try:
+            # Lazy import to avoid requiring PostgreSQL libraries when not using Postgres
+            from langgraph.checkpoint.postgres import PostgresSaver
+            
             return await PostgresSaver.from_conn_string(
                 host=config.get("postgres", {}).get("host", "localhost"),
                 port=int(config.get("postgres", {}).get("port", 5432)),
