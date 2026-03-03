@@ -91,6 +91,7 @@ async def validator(state: State):
     if state['request']['type'] in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:
         response_json = {"results": input_, "recommendation_result": new_message}
         new_message = AIMessage(json.dumps(response_json))
+        os.makedirs("src/chat/data/test_results", exist_ok=True)
         with open("src/chat/data/test_results/test_results.json", "w") as f:
             json.dump(response_json, f)
         prompt_slug = state["request"]["prompt_fqn"].split("/")[-1].split(":")[0]
