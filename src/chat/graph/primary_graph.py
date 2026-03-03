@@ -58,13 +58,23 @@ async def validator(state: State):
     elif state['request']['type'] == RequestType.VERIFY_TESTS.value:
         # Use DeepEval metrics for evaluation
         prompt_template_id = CONFIG.get("assistants.prompt_test_eval_recommendation.prompt_template_id")
-        evaluator = DeepEvalPromptEvaluator(model_name=state["request"].get("model_name"))
+        evaluator = DeepEvalPromptEvaluator(
+            model_name=state["request"].get("model_name"),
+            max_tokens=state["request"].get("max_tokens"),
+            temperature=state["request"].get("temperature"),
+            reasoning_effort=state["request"].get("reasoning_effort"),
+        )
         input_ = await evaluator.verify_tests(state)
     
     elif state['request']['type'] == RequestType.VERIFY_TESTS_EXACT.value:
         # Use exact matching for evaluation
         prompt_template_id = CONFIG.get("assistants.prompt_test_eval_exact_recommendation.prompt_template_id")
-        evaluator = ExactMatchEvaluator(model_name=state["request"].get("model_name"))
+        evaluator = ExactMatchEvaluator(
+            model_name=state["request"].get("model_name"),
+            max_tokens=state["request"].get("max_tokens"),
+            temperature=state["request"].get("temperature"),
+            reasoning_effort=state["request"].get("reasoning_effort"),
+        )
         input_ = await evaluator.verify_tests(state)
 
     # Get prompt response
@@ -73,6 +83,9 @@ async def validator(state: State):
         {"input": str(input_)},
         model_name=state["request"].get("model_name"),
         response_schema=response_schema,
+        max_tokens=state["request"].get("max_tokens"),
+        temperature=state["request"].get("temperature"),
+        reasoning_effort=state["request"].get("reasoning_effort"),
     )
     info(f"new_message: {new_message}")
     if state['request']['type'] in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:

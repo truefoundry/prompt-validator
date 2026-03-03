@@ -20,10 +20,14 @@ def fetch_recommendations() -> None:
         st.error("Please enter Prompt FQN before fetching recommendations.")
         return
 
+    reasoning = st.session_state.reasoning_effort
     payload = {
         "sessionId": st.session_state.session_id,
         "promptFQN": prompt_fqn,
         "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
         "type": "validation",
         "recommendations": None,
     }
@@ -75,10 +79,14 @@ def apply_recommendations() -> None:
         st.error("Select at least one recommendation before applying.")
         return
 
+    reasoning = st.session_state.reasoning_effort
     payload = {
         "sessionId": st.session_state.session_id,
         "promptFQN": prompt_fqn,
         "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
         "type": "validation",
         "recommendations": selected,
     }
@@ -122,10 +130,14 @@ def run_tests_with_file(tab: str) -> None:
         st.error("Please upload a test cases JSON file before running tests.")
         return
 
+    reasoning = st.session_state.reasoning_effort
     payload = {
         "sessionId": st.session_state.session_id,
         "promptFQN": prompt_fqn,
         "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
         "type": req_type,
         "isRAG": is_rag,
         "testCases": uploaded_tests,

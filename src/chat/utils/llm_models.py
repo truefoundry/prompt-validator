@@ -83,6 +83,9 @@ def get_recommendation_response_schema() -> dict[str, Any]:
 def get_truefoundry_llm(
     model_name: str | None = None,
     response_schema: dict[str, Any] | None = None,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+    reasoning_effort: str | None = None,
 ):
     selected_model_name = _resolve_model_name(model_name)
     info(f"Using TrueFoundry model: {selected_model_name}")
@@ -101,11 +104,13 @@ def get_truefoundry_llm(
                 "schema": response_schema,
             },
         }
+    if reasoning_effort:
+        model_kwargs["reasoning_effort"] = reasoning_effort
 
     return ChatOpenAI(
         model=selected_model_name,
-        temperature=0.1,
-        max_tokens=15000,
+        temperature=temperature if temperature is not None else 0.1,
+        max_tokens=max_tokens or 15000,
         streaming=False,
         openai_api_key=os.getenv("TFY_API_KEY"),
         base_url=os.getenv("LLM_BASE_URL"),
@@ -122,13 +127,6 @@ class TrueFoundryLLM(DeepEvalBaseLLM):
     """
     
     def __init__(self, model=None):
-        """
-        Initialize the adapter with a TrueFoundry model.
-        
-        Args:
-            model: An instance of ChatOpenAI (TrueFoundry) to wrap. 
-                   If None, will use get_truefoundry_llm()
-        """
         self.model = model if model is not None else get_truefoundry_llm()
     
     def load_model(self):
@@ -175,8 +173,7 @@ class TrueFoundryLLM(DeepEvalBaseLLM):
         return res.content
     
     def get_model_name(self):
-        """Return the name of the model."""
-        return "TrueFoundry GPT-4o"
+        return f"TrueFoundry {self.model.model_name}"
 
 
 class AzureOpenAI(DeepEvalBaseLLM):

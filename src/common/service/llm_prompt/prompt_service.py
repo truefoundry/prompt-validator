@@ -56,6 +56,9 @@ class PromptService:
         data: Dict[str, Any],
         model_name: Optional[str] = None,
         response_schema: Optional[Dict[str, Any]] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        reasoning_effort: Optional[str] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """Fetches LLM response for a given prompt and input using TrueFoundry client and LLM.
@@ -91,7 +94,13 @@ class PromptService:
                 elif msg['role'] == 'assistant':
                     messages.append(AIMessage(content=msg['content']))
             # Get LLM and invoke
-            llm = get_truefoundry_llm(model_name=model_name, response_schema=response_schema)
+            llm = get_truefoundry_llm(
+                model_name=model_name,
+                response_schema=response_schema,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                reasoning_effort=reasoning_effort,
+            )
             response = await llm.ainvoke(messages)
             return response.content
 

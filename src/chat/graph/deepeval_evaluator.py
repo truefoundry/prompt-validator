@@ -17,7 +17,12 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
     async def get_all_metrics(self, is_rag):
         """Get all DeepEval metrics."""
         # get the llm to be used as judge - use TrueFoundry LLM wrapped in DeepEval adapter
-        custom_llm = TrueFoundryLLM(model=get_truefoundry_llm(self.model_name))
+        custom_llm = TrueFoundryLLM(model=get_truefoundry_llm(
+            self.model_name,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            reasoning_effort=self.reasoning_effort,
+        ))
 
         # Define the different metrics
         correctness_metric = GEval(

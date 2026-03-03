@@ -11,10 +11,19 @@ from src.common.service.logging.logger import error, info
 class PromptEvaluator(ABC):
     """Base class for prompt evaluation strategies."""
     
-    def __init__(self, model_name: str | None = None):
+    def __init__(
+        self,
+        model_name: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        reasoning_effort: str | None = None,
+    ):
         self.config = get_application_config()
         self.tf_client = get_client()
         self.model_name = model_name
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+        self.reasoning_effort = reasoning_effort
     
     async def get_all_tests_db(self, prompt_fqn):
         """Fetch test cases from the truefoundry artifact."""
@@ -41,6 +50,9 @@ class PromptEvaluator(ABC):
                 prompt_fqn=prompt_fqn,
                 data=test["data"],
                 model_name=self.model_name,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                reasoning_effort=self.reasoning_effort,
             )
             test["actual_output"] = response
             return test

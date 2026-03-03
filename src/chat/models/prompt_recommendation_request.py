@@ -19,6 +19,20 @@ class PromptRecommendationRequest(BaseModel):
         alias="modelName",
         description="Optional model name to use for this request.",
     )
+    max_tokens: Optional[int] = Field(
+        None,
+        alias="maxTokens",
+        description="Maximum number of tokens in the model response.",
+    )
+    temperature: Optional[float] = Field(
+        None,
+        description="Controls randomness. Lower values are more deterministic.",
+    )
+    reasoning_effort: Optional[str] = Field(
+        None,
+        alias="reasoningEffort",
+        description="Reasoning effort level: 'high', 'medium', 'low', or 'no' (Gemini only).",
+    )
     type: str = Field(..., description="The type of input request")
     recommendations: Optional[List[str]] = Field(..., description="The list of recommendations for each section in order to improve the prompt.")
     test_cases: Optional[List[dict]] = Field(

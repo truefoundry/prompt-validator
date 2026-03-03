@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-settings>=2.10.1",
     "redis>=6.2.0",
     "scikit-learn>=1.7.1",
+    "streamlit>=1.46.1",
     "truefoundry>=0.11.2",
     "uvicorn>=0.35.0",
 ]
