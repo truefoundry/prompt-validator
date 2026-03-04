@@ -104,18 +104,19 @@ def get_truefoundry_llm(
                 "schema": response_schema,
             },
         }
+    kwargs: dict[str, Any] = {
+        "model": selected_model_name,
+        "temperature": temperature if temperature is not None else 0.1,
+        "max_tokens": max_tokens or 15000,
+        "streaming": False,
+        "openai_api_key": os.getenv("TFY_API_KEY"),
+        "base_url": os.getenv("LLM_BASE_URL"),
+        "model_kwargs": model_kwargs,
+    }
     if reasoning_effort:
-        model_kwargs["reasoning_effort"] = reasoning_effort
+        kwargs["reasoning_effort"] = reasoning_effort
 
-    return ChatOpenAI(
-        model=selected_model_name,
-        temperature=temperature if temperature is not None else 0.1,
-        max_tokens=max_tokens or 15000,
-        streaming=False,
-        openai_api_key=os.getenv("TFY_API_KEY"),
-        base_url=os.getenv("LLM_BASE_URL"),
-        model_kwargs=model_kwargs,
-    )
+    return ChatOpenAI(**kwargs)
 
 
 class TrueFoundryLLM(DeepEvalBaseLLM):

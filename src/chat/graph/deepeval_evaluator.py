@@ -135,10 +135,14 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
             "Number of Tests with Errors": len(all_tests) - len(metric_tests)
         }
 
-        count = len(all_tests)
         for metric_name in metric_tests[0]['metric_values'].keys() if metric_tests else []:
-            metric_values[f"Average {metric_name}"] = sum(
-                [test['metric_values'][metric_name]['score'] for test in metric_tests]
-            ) / count
+            scores = [
+                test['metric_values'][metric_name]['score']
+                for test in metric_tests
+                if test['metric_values'][metric_name]['score'] is not None
+            ]
+            metric_values[f"Average {metric_name}"] = (
+                sum(scores) / len(scores) if scores else None
+            )
         
         return {"all_tests": evaluation_results, "all_metrics": metric_values} 
