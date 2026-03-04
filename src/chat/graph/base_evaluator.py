@@ -43,23 +43,36 @@ class PromptEvaluator(ABC):
             error(f"Error fetching test cases: {str(e)}")
             return []
     
-    async def get_test_responses(self, prompt_fqn, all_tests):
-        """Get responses for all test cases in parallel."""
+    async def get_test_responses(self, prompt_fqn, all_tests, *, system_prompt=None, user_prompt_template=None):
+        """Get responses for all test cases in parallel.
+
+        When *system_prompt* is provided the LLM is invoked directly from the
+        raw text instead of resolving a TFY FQN.
+        """
         async def get_single_response(test):
-            response = await PromptService.get_prompt_response(
-                prompt_fqn=prompt_fqn,
-                data=test["data"],
-                model_name=self.model_name,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature,
-                reasoning_effort=self.reasoning_effort,
-            )
+            if system_prompt:
+                response = await PromptService.get_prompt_response_from_text(
+                    system_prompt=system_prompt,
+                    user_prompt_template=user_prompt_template,
+                    data=test["data"],
+                    model_name=self.model_name,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
+                    reasoning_effort=self.reasoning_effort,
+                )
+            else:
+                response = await PromptService.get_prompt_response(
+                    prompt_fqn=prompt_fqn,
+                    data=test["data"],
+                    model_name=self.model_name,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
+                    reasoning_effort=self.reasoning_effort,
+                )
             test["actual_output"] = response
             return test
 
-        # Create tasks for all test cases
         tasks = [get_single_response(test) for test in all_tests]
-        # Execute all tasks concurrently
         all_tests = await asyncio.gather(*tasks)
         return all_tests
     
@@ -75,28 +88,32 @@ class PromptEvaluator(ABC):
     
     async def verify_tests(self, state):
         """Main method to verify tests using the specific evaluation strategy."""
-        # Get prompt details
-        prompt_fqn = state['request']['prompt_fqn']
+        prompt_fqn = state['request'].get('prompt_fqn')
+        system_prompt = state['request'].get('system_prompt')
+        user_prompt_template = state['request'].get('user_prompt_template')
 
-        # Use provided test cases if supplied, otherwise fetch from TrueFoundry
         provided_tests = state['request'].get('test_cases')
         if provided_tests:
             all_tests = provided_tests
             info(f"Using {len(all_tests)} test cases from request payload.")
-        else:
+        elif prompt_fqn:
             all_tests = await self.get_all_tests_db(prompt_fqn)
             all_tests = all_tests[:10]
+        else:
+            error("No test cases provided and no prompt FQN to fetch from artifacts.")
+            return []
         info(f"Number of test cases created: {len(all_tests)}")
         
-        # Get all actual outputs
-        all_tests = await self.get_test_responses(prompt_fqn, all_tests)
+        all_tests = await self.get_test_responses(
+            prompt_fqn, all_tests,
+            system_prompt=system_prompt,
+            user_prompt_template=user_prompt_template,
+        )
         info("Test responses received.")
         
-        # Evaluate tests using the specific strategy
         evaluation_results = await self.evaluate_tests(all_tests, state['request']['is_rag'])
         info("Test evaluation completed.")
-        # Generate final report
         report = self.get_final_report(all_tests, evaluation_results)
         info("Final report generated.")
 
-        return report 
+        return report

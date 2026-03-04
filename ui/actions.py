@@ -14,16 +14,51 @@ from .extractors import (
 from .tfy_prompt_client import get_prompt_text_by_fqn
 
 
+def _is_paste_mode(mode_key: str) -> bool:
+    return st.session_state.get(mode_key) == "Paste Prompt Text"
+
+
+def _build_prompt_payload(mode_key: str, fqn_key: str, sys_key: str, user_tpl_key: str) -> dict:
+    """Return the prompt-identification fields for the API payload.
+
+    In FQN mode the dict contains ``promptFQN``; in paste mode it contains
+    ``systemPrompt`` and optionally ``userPromptTemplate``.
+    """
+    if _is_paste_mode(mode_key):
+        result: dict = {"systemPrompt": st.session_state.get(sys_key, "").strip()}
+        user_tpl = st.session_state.get(user_tpl_key, "").strip()
+        if user_tpl:
+            result["userPromptTemplate"] = user_tpl
+        return result
+    return {"promptFQN": st.session_state.get(fqn_key, "").strip()}
+
+
+def _validate_prompt_input(mode_key: str, fqn_key: str, sys_key: str) -> bool:
+    """Validate that at least one prompt source has been provided. Returns True when valid."""
+    if _is_paste_mode(mode_key):
+        if not st.session_state.get(sys_key, "").strip():
+            st.error("Please enter a system prompt before proceeding.")
+            return False
+    else:
+        if not st.session_state.get(fqn_key, "").strip():
+            st.error("Please enter a Prompt FQN before proceeding.")
+            return False
+    return True
+
+
 def fetch_recommendations() -> None:
-    prompt_fqn = st.session_state.prompt_fqn.strip()
-    if not prompt_fqn:
-        st.error("Please enter Prompt FQN before fetching recommendations.")
+    if not _validate_prompt_input("prompt_input_mode", "prompt_fqn", "system_prompt_text"):
         return
+
+    paste_mode = _is_paste_mode("prompt_input_mode")
+    prompt_fields = _build_prompt_payload(
+        "prompt_input_mode", "prompt_fqn", "system_prompt_text", "user_prompt_template_text",
+    )
 
     reasoning = st.session_state.reasoning_effort
     payload = {
         "sessionId": st.session_state.session_id,
-        "promptFQN": prompt_fqn,
+        **prompt_fields,
         "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
         "maxTokens": st.session_state.max_tokens,
         "temperature": st.session_state.temperature,
@@ -35,14 +70,25 @@ def fetch_recommendations() -> None:
     with st.spinner("Fetching prompt and recommendations..."):
         try:
             tfy_prompt_text = ""
-            try:
-                tfy_prompt_text = get_prompt_text_by_fqn(prompt_fqn)
-            except Exception as tfy_error:
-                st.warning(f"Unable to fetch prompt directly from TrueFoundry: {tfy_error}")
+            if not paste_mode:
+                try:
+                    tfy_prompt_text = get_prompt_text_by_fqn(prompt_fields["promptFQN"])
+                except Exception as tfy_error:
+                    st.warning(f"Unable to fetch prompt directly from TrueFoundry: {tfy_error}")
 
             data = post_chat(payload, include_grid_header=True)
             extracted_original_prompt = extract_original_prompt(data)
-            st.session_state.original_prompt = tfy_prompt_text or extracted_original_prompt
+
+            if paste_mode:
+                sys_text = st.session_state.get("system_prompt_text", "").strip()
+                user_tpl = st.session_state.get("user_prompt_template_text", "").strip()
+                pasted_text = f"system: {sys_text}"
+                if user_tpl:
+                    pasted_text += f"\n\nuser: {user_tpl}"
+                st.session_state.original_prompt = pasted_text
+            else:
+                st.session_state.original_prompt = tfy_prompt_text or extracted_original_prompt
+
             st.session_state.recommendations = extract_recommendations(data)
             st.session_state.total_score = extract_total_score(data)
             st.session_state.criteria_scores = extract_criteria_scores(data)
@@ -58,7 +104,7 @@ def fetch_recommendations() -> None:
             else:
                 st.success(
                     "Recommendations fetched successfully. "
-                    "Note: prompt content could not be loaded from TrueFoundry for this FQN."
+                    "Note: prompt content could not be loaded for display."
                 )
         except requests.RequestException as exc:
             st.error(f"Failed to fetch recommendations: {exc}")
@@ -69,9 +115,7 @@ def fetch_recommendations() -> None:
 
 
 def apply_recommendations() -> None:
-    prompt_fqn = st.session_state.prompt_fqn.strip()
-    if not prompt_fqn:
-        st.error("Prompt FQN is required. Fetch recommendations first.")
+    if not _validate_prompt_input("prompt_input_mode", "prompt_fqn", "system_prompt_text"):
         return
 
     selected = st.session_state.editable_recommendations or st.session_state.selected_recommendations
@@ -79,10 +123,14 @@ def apply_recommendations() -> None:
         st.error("Select at least one recommendation before applying.")
         return
 
+    prompt_fields = _build_prompt_payload(
+        "prompt_input_mode", "prompt_fqn", "system_prompt_text", "user_prompt_template_text",
+    )
+
     reasoning = st.session_state.reasoning_effort
     payload = {
         "sessionId": st.session_state.session_id,
-        "promptFQN": prompt_fqn,
+        **prompt_fields,
         "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
         "maxTokens": st.session_state.max_tokens,
         "temperature": st.session_state.temperature,
@@ -113,16 +161,17 @@ def apply_recommendations() -> None:
 
 def run_tests_with_file(tab: str) -> None:
     """Run tests using uploaded test cases."""
+    mode_key = f"{tab}_input_mode"
     fqn_key = f"{tab}_prompt_fqn"
+    sys_key = f"{tab}_system_prompt"
+    user_tpl_key = f"{tab}_user_prompt_template"
     uploaded_key = f"{tab}_uploaded_tests"
     result_key = f"{tab}_result"
     debug_key = f"{tab}_api_debug"
     req_type = "verify_tests" if tab == "deepeval" else "verify_tests_exact"
     is_rag = st.session_state.get("deepeval_is_rag", False) if tab == "deepeval" else False
 
-    prompt_fqn = st.session_state[fqn_key].strip()
-    if not prompt_fqn:
-        st.error("Please enter a Prompt FQN.")
+    if not _validate_prompt_input(mode_key, fqn_key, sys_key):
         return
 
     uploaded_tests = st.session_state.get(uploaded_key)
@@ -130,10 +179,12 @@ def run_tests_with_file(tab: str) -> None:
         st.error("Please upload a test cases JSON file before running tests.")
         return
 
+    prompt_fields = _build_prompt_payload(mode_key, fqn_key, sys_key, user_tpl_key)
+
     reasoning = st.session_state.reasoning_effort
     payload = {
         "sessionId": st.session_state.session_id,
-        "promptFQN": prompt_fqn,
+        **prompt_fields,
         "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
         "maxTokens": st.session_state.max_tokens,
         "temperature": st.session_state.temperature,

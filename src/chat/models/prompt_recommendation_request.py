@@ -1,17 +1,28 @@
-from pydantic import BaseModel, Field, create_model
+from pydantic import BaseModel, Field, create_model, model_validator
 from typing import List, Optional
 
 
 class PromptRecommendationRequest(BaseModel):
     """
     Payload for the Prompt Validation service.
+    Accepts either a TFY Prompt FQN **or** raw prompt text (system + optional user template).
     """
 
     session_id: str = Field(
         ..., alias="sessionId", min_length=1, description="Session ID for the prompt validation conversation."
     )
-    prompt_fqn: str = Field(
-        ..., alias="promptFQN", description="Prompt ID for the prompt that needs to be validated."
+    prompt_fqn: Optional[str] = Field(
+        default=None, alias="promptFQN", description="Prompt FQN for the prompt that needs to be validated."
+    )
+    system_prompt: Optional[str] = Field(
+        default=None,
+        alias="systemPrompt",
+        description="Raw system prompt text (alternative to promptFQN).",
+    )
+    user_prompt_template: Optional[str] = Field(
+        default=None,
+        alias="userPromptTemplate",
+        description="Raw user prompt template text. May contain {{input}} for variable injection.",
     )
     is_rag: Optional[bool] = Field(False, alias="isRAG", description="Whether the prompt is a RAG prompt.")
     model_name: Optional[str] = Field(
@@ -40,3 +51,9 @@ class PromptRecommendationRequest(BaseModel):
         alias="testCases",
         description="Optional test cases to use instead of fetching from TrueFoundry.",
     )
+
+    @model_validator(mode="after")
+    def require_fqn_or_raw_text(self):
+        if not self.prompt_fqn and not self.system_prompt:
+            raise ValueError("Either promptFQN or systemPrompt must be provided.")
+        return self

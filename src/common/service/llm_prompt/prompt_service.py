@@ -1,4 +1,5 @@
 import asyncio
+import re
 from typing import Dict, Any, Optional, List
 
 from fastapi import HTTPException
@@ -108,4 +109,55 @@ class PromptService:
             error(f"Error getting prompt response: {e}")
             raise HTTPException(
                 status_code=500, detail=f"Failed to get prompt response: {str(e)}"
+            ) from e
+
+    @staticmethod
+    async def get_prompt_response_from_text(
+        system_prompt: str,
+        user_prompt_template: Optional[str],
+        data: Dict[str, Any],
+        model_name: Optional[str] = None,
+        response_schema: Optional[Dict[str, Any]] = None,
+        max_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        reasoning_effort: Optional[str] = None,
+        **kwargs,
+    ) -> str:
+        """Invokes the LLM using raw prompt text instead of a TFY FQN.
+
+        Variable placeholders like ``{{key}}`` in *user_prompt_template* are
+        replaced with matching values from *data*.
+        """
+        if not system_prompt:
+            raise HTTPException(status_code=400, detail="system_prompt is required")
+
+        try:
+            info(f"PromptService (raw text) request model_name: {model_name}")
+            messages: List[BaseMessage] = [SystemMessage(content=system_prompt)]
+
+            if user_prompt_template:
+                rendered_user = re.sub(
+                    r"\{\{(\w+)\}\}",
+                    lambda m: str(data.get(m.group(1), m.group(0))),
+                    user_prompt_template,
+                )
+                messages.append(HumanMessage(content=rendered_user))
+            elif data.get("input"):
+                messages.append(HumanMessage(content=str(data["input"])))
+
+            llm = get_truefoundry_llm(
+                model_name=model_name,
+                response_schema=response_schema,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                reasoning_effort=reasoning_effort,
+            )
+            response = await llm.ainvoke(messages)
+            return response.content
+
+        except Exception as e:
+            error(f"Error getting prompt response from text: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to get prompt response from text: {str(e)}",
             ) from e

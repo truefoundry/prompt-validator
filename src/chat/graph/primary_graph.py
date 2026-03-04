@@ -1,6 +1,7 @@
 import base64
 import json   
 import asyncio
+from types import SimpleNamespace
 from typing import Optional, List
 import csv
 import os
@@ -38,17 +39,36 @@ async def validate_fn(state, prompt_to_validate):
         return {"prompt_messages_list":prompt_to_validate[0]['manifest'].messages,
                 "recommendations": state['request']['recommendations']}
 
+def _build_synthetic_prompt(state):
+    """Build a synthetic prompt structure from raw text that matches the TFY format."""
+    msgs = [SimpleNamespace(role="system", content=state["request"]["system_prompt"])]
+    user_tpl = state["request"].get("user_prompt_template")
+    if user_tpl:
+        msgs.append(SimpleNamespace(role="user", content=user_tpl))
+    return [{"manifest": SimpleNamespace(messages=msgs)}]
+
+
+def _get_prompt_slug(state):
+    """Derive a prompt slug from FQN or fall back to a default for pasted prompts."""
+    fqn = state["request"].get("prompt_fqn")
+    if fqn:
+        return fqn.split("/")[-1].split(":")[0]
+    return "pasted_prompt"
+
+
 async def validator(state: State):
-    prompt_to_validate = await PromptService.get_prompt_details([state['request']['prompt_fqn']])
-    # If the prompt was not found
-    if not prompt_to_validate:
-        return {"messages": ["Prompt not found"]}
+    prompt_fqn = state["request"].get("prompt_fqn")
+
+    if prompt_fqn:
+        prompt_to_validate = await PromptService.get_prompt_details([prompt_fqn])
+        if not prompt_to_validate:
+            return {"messages": ["Prompt not found"]}
+    else:
+        prompt_to_validate = _build_synthetic_prompt(state)
 
     response_schema = None
     if state['request']['type'] == RequestType.VALIDATION.value:
         if not state['request']['recommendations']:
-        # if the recommendation list is empty
-            # Get prompt ID from config
             prompt_template_id = CONFIG.get("assistants.get_recommendation.prompt_template_id")
             response_schema = get_recommendation_response_schema()
         else:
@@ -56,7 +76,6 @@ async def validator(state: State):
         input_ = await validate_fn(state, prompt_to_validate)
 
     elif state['request']['type'] == RequestType.VERIFY_TESTS.value:
-        # Use DeepEval metrics for evaluation
         prompt_template_id = CONFIG.get("assistants.prompt_test_eval_recommendation.prompt_template_id")
         evaluator = DeepEvalPromptEvaluator(
             model_name=state["request"].get("model_name"),
@@ -67,7 +86,6 @@ async def validator(state: State):
         input_ = await evaluator.verify_tests(state)
     
     elif state['request']['type'] == RequestType.VERIFY_TESTS_EXACT.value:
-        # Use exact matching for evaluation
         prompt_template_id = CONFIG.get("assistants.prompt_test_eval_exact_recommendation.prompt_template_id")
         evaluator = ExactMatchEvaluator(
             model_name=state["request"].get("model_name"),
@@ -77,7 +95,6 @@ async def validator(state: State):
         )
         input_ = await evaluator.verify_tests(state)
 
-    # Get prompt response
     new_message = await PromptService.get_prompt_response(
         prompt_template_id,
         {"input": str(input_)},
@@ -94,11 +111,12 @@ async def validator(state: State):
         os.makedirs("src/chat/data/test_results", exist_ok=True)
         with open("src/chat/data/test_results/test_results.json", "w") as f:
             json.dump(response_json, f)
-        prompt_slug = state["request"]["prompt_fqn"].split("/")[-1].split(":")[0]
-        evaluator.tf_client.log_artifact(
-            ml_repo=CONFIG.get("application_details.ml_repo"),
-            name=f"{prompt_slug}_test_results",
-            artifact_paths=[ArtifactPath(src="src/chat/data/test_results/test_results.json", dest="test_results.json")])
+        prompt_slug = _get_prompt_slug(state)
+        if prompt_fqn:
+            evaluator.tf_client.log_artifact(
+                ml_repo=CONFIG.get("application_details.ml_repo"),
+                name=f"{prompt_slug}_test_results",
+                artifact_paths=[ArtifactPath(src="src/chat/data/test_results/test_results.json", dest="test_results.json")])
     else:
         new_message = AIMessage(new_message)
     return {"messages": [new_message]}

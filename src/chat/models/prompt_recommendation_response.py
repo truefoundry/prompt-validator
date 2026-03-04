@@ -55,7 +55,7 @@ class PromptRecommendationResponse(BaseModel):
     """
     Response from the agent.
     """
-    prompt_fqn: str = Field(..., description="Prompt ID for the prompt that needs to be validated.")
+    prompt_fqn: Optional[str] = Field(None, description="Prompt FQN for the prompt that was validated (None when raw text was used).")
     session_id: str = Field(..., description="The session id of the chat.")
     content: Content = Field(..., description="The response from the agent.")
     status_code: str = Field(..., description="The status code of the response.")

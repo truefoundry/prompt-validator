@@ -163,7 +163,7 @@ def _get_graph_configuration(request: PromptRecommendationRequest) -> dict:
         # else [],
         "configurable": {
             "thread_id": request.session_id,
-            "prompt_fqn": request.prompt_fqn
+            "prompt_fqn": request.prompt_fqn or "pasted_prompt",
         },
         "recursion_limit": 15,
     }
@@ -180,8 +180,9 @@ async def _resume_a_new_conversation(request, configuration, graph):
         list: The list of events from the graph.
     """
     events = []
-    async for event in graph.astream(  # Changed from stream to astream
-        {"messages": ("user", request.prompt_fqn), "request": request.model_dump()},
+    prompt_label = request.prompt_fqn or "pasted_prompt"
+    async for event in graph.astream(
+        {"messages": ("user", prompt_label), "request": request.model_dump()},
         config=configuration,
         stream_mode="values",
     ):
