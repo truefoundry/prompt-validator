@@ -8,7 +8,7 @@ assistants:
   get_recommendation:
     prompt_template_id: "chat_prompt:truefoundry/new-repo/get_recommendation:7"
   apply_recommendation:
-    prompt_template_id: "chat_prompt:truefoundry/new-repo/apply_recommendation:5"
+    prompt_template_id: "chat_prompt:truefoundry/new-repo/apply_recommendation:6"
   prompt_test_eval_recommendation:
     prompt_template_id: "chat_prompt:truefoundry/new-repo/verify_tests:1"
   prompt_test_eval_exact_recommendation:
