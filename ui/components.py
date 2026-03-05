@@ -1,6 +1,165 @@
 import difflib
+import re
 
 import streamlit as st
+
+_PROMPT_CONTAINER_CSS = """\
+<style>
+.prompt-box {
+    border: 1px solid rgba(150,150,150,0.25);
+    border-radius: 8px;
+    overflow-y: auto;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.65;
+    padding: 0;
+    background: rgba(30,30,30,0.35);
+}
+.prompt-box .prompt-line {
+    display: flex;
+    padding: 0 16px;
+    min-height: 20px;
+    border-bottom: 1px solid rgba(150,150,150,0.06);
+}
+.prompt-box .prompt-line:hover {
+    background: rgba(255,255,255,0.03);
+}
+.prompt-box .line-no {
+    flex-shrink: 0;
+    width: 38px;
+    text-align: right;
+    padding-right: 14px;
+    color: rgba(150,150,150,0.35);
+    user-select: none;
+    font-size: 11px;
+    line-height: 1.65;
+}
+.prompt-box .line-content {
+    flex: 1;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #e0e0e0;
+}
+.prompt-box .xml-tag { color: #7ec8e3; }
+.prompt-box .xml-attr-name { color: #c9a0dc; }
+.prompt-box .xml-attr-value { color: #ce9178; }
+.prompt-box .tpl-var { color: #dcdcaa; font-weight: 600; }
+.prompt-box .md-heading { color: #569cd6; font-weight: 700; }
+.prompt-box .md-bold { color: #e0e0e0; font-weight: 700; }
+.prompt-box .md-bullet { color: #6a9955; font-weight: 700; }
+.prompt-box .comment-line { color: #6a9955; font-style: italic; }
+.prompt-box .empty-line { min-height: 20px; }
+.prompt-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: rgba(80,80,80,0.25);
+    border-bottom: 1px solid rgba(150,150,150,0.15);
+    border-radius: 8px 8px 0 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    color: rgba(200,200,200,0.7);
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+.prompt-header .line-count {
+    font-size: 11px;
+    opacity: 0.6;
+    text-transform: none;
+}
+</style>
+"""
+
+_TAG_RE = re.compile(
+    r'(&lt;/?)'                     # opening < or </
+    r'([\w:.-]+)'                   # tag name
+    r'((?:\s+[\w:.-]+\s*=\s*'       # optional attributes
+    r'(?:&quot;[^&]*?&quot;|'
+    r"&apos;[^&]*?&apos;|"
+    r'&amp;\w+;|[^\s&>]*))*)'
+    r'(\s*/?&gt;)',                  # closing > or />
+    re.DOTALL,
+)
+_ATTR_RE = re.compile(
+    r'([\w:.-]+)(\s*=\s*)((?:&quot;[^&]*?&quot;|&apos;[^&]*?&apos;|[^\s&]+))'
+)
+_TPL_VAR_RE = re.compile(r'(\{\{[\w.\-\s|]+?\}\}|\{[\w.\-]+?\})')
+_MD_HEADING_RE = re.compile(r'^(#{1,6}\s+.*)$', re.MULTILINE)
+_MD_BOLD_RE = re.compile(r'(\*\*[^*]+?\*\*|__[^_]+?__)')
+_MD_BULLET_RE = re.compile(r'^(\s*(?:[-*]|\d+\.)\s)')
+
+
+def _highlight(text: str) -> str:
+    """Apply syntax highlighting to an already-HTML-escaped line of prompt text."""
+    text = _TAG_RE.sub(_highlight_tag, text)
+    text = _TPL_VAR_RE.sub(r'<span class="tpl-var">\1</span>', text)
+    text = _MD_BOLD_RE.sub(r'<span class="md-bold">\1</span>', text)
+    m_bullet = _MD_BULLET_RE.match(text)
+    if m_bullet:
+        text = f'<span class="md-bullet">{m_bullet.group(1)}</span>{text[m_bullet.end():]}'
+    return text
+
+
+def _highlight_tag(m: re.Match) -> str:
+    open_bracket = m.group(1)
+    tag_name = m.group(2)
+    attrs_raw = m.group(3)
+    close_bracket = m.group(4)
+
+    attrs_highlighted = _ATTR_RE.sub(
+        r'<span class="xml-attr-name">\1</span>\2<span class="xml-attr-value">\3</span>',
+        attrs_raw,
+    )
+    return (
+        f'<span class="xml-tag">{open_bracket}{tag_name}</span>'
+        f'{attrs_highlighted}'
+        f'<span class="xml-tag">{close_bracket}</span>'
+    )
+
+
+def render_prompt_html(prompt_text: str, *, label: str = "Prompt", max_height: int = 480) -> None:
+    """Render a prompt string as a syntax-highlighted, read-only HTML block."""
+    if not prompt_text:
+        st.info(f"No {label.lower()} available yet.")
+        return
+
+    lines = prompt_text.splitlines()
+    line_count = len(lines)
+
+    html_lines: list[str] = []
+    for i, raw_line in enumerate(lines, start=1):
+        escaped = _escape(raw_line)
+        if not escaped.strip():
+            html_lines.append(
+                f'<div class="prompt-line empty-line">'
+                f'<span class="line-no">{i}</span>'
+                f'<span class="line-content"> </span></div>'
+            )
+            continue
+
+        is_heading = raw_line.lstrip().startswith("#")
+        highlighted = _highlight(escaped)
+        if is_heading:
+            highlighted = f'<span class="md-heading">{highlighted}</span>'
+
+        html_lines.append(
+            f'<div class="prompt-line">'
+            f'<span class="line-no">{i}</span>'
+            f'<span class="line-content">{highlighted}</span></div>'
+        )
+
+    html = (
+        f'{_PROMPT_CONTAINER_CSS}'
+        f'<div class="prompt-box" style="max-height:{max_height}px;">'
+        f'<div class="prompt-header">'
+        f'<span>{_escape(label)}</span>'
+        f'<span class="line-count">{line_count} line{"s" if line_count != 1 else ""}</span>'
+        f'</div>'
+        f'{"".join(html_lines)}'
+        f'</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def render_recommendation_checkboxes() -> None:

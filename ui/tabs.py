@@ -11,6 +11,7 @@ from .components import (
     render_deepeval_results,
     render_diff,
     render_exact_match_results,
+    render_prompt_html,
     render_recommendation_checkboxes,
     render_scores,
     render_selected_recommendations_editor,
@@ -162,15 +163,14 @@ def render_recommendations_tab() -> None:
     col_left, col_right = st.columns([2, 3])
     with col_left:
         st.write("### Original Prompt")
-        st.text_area(
-            "Original Prompt",
-            value=st.session_state.original_prompt,
-            height=420,
-            disabled=True,
-            label_visibility="collapsed",
-            placeholder="Original prompt will appear here after API call.",
-        )
-        if not st.session_state.original_prompt:
+        if st.session_state.original_prompt:
+            render_prompt_html(
+                st.session_state.original_prompt,
+                label="Original Prompt",
+                max_height=480,
+            )
+        else:
+            st.info("Original prompt will appear here after API call.")
             st.caption(
                 "Original prompt text is not present in current endpoint-1 response; "
                 "you will still get recommendations and scores."
@@ -181,15 +181,13 @@ def render_recommendations_tab() -> None:
 
 def render_enhance_tab() -> None:
     st.subheader("Enhance Prompt")
-    st.write("### Original Prompt (Read-only)")
-    st.text_area(
-        "Original Prompt (Read-only)",
-        value=st.session_state.original_prompt,
-        height=220,
-        disabled=True,
-        label_visibility="collapsed",
-        placeholder="Fetch recommendations in Tab 1 to load the prompt.",
-    )
+
+    with st.expander("Original Prompt (Read-only)", expanded=False):
+        render_prompt_html(
+            st.session_state.original_prompt,
+            label="Original Prompt",
+            max_height=320,
+        )
 
     render_selected_recommendations_editor()
 
@@ -197,7 +195,31 @@ def render_enhance_tab() -> None:
         apply_recommendations()
 
     st.divider()
-    render_diff(st.session_state.original_prompt, st.session_state.enhanced_prompt)
+
+    if st.session_state.enhanced_prompt:
+        view_mode = st.radio(
+            "View",
+            ("Enhanced Prompt", "Diff View"),
+            horizontal=True,
+            key="enhance_view_mode",
+        )
+        if view_mode == "Enhanced Prompt":
+            render_prompt_html(
+                st.session_state.enhanced_prompt,
+                label="Enhanced Prompt",
+                max_height=520,
+            )
+            st.download_button(
+                label="Save Enhanced Prompt",
+                data=st.session_state.enhanced_prompt,
+                file_name="enhanced_prompt.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+        else:
+            render_diff(st.session_state.original_prompt, st.session_state.enhanced_prompt)
+    else:
+        render_diff(st.session_state.original_prompt, st.session_state.enhanced_prompt)
 
     with st.expander("Debug: Last API Response", expanded=False):
         st.json(st.session_state.api_response_debug)
