@@ -24,6 +24,11 @@ class PromptRecommendationRequest(BaseModel):
         alias="userPromptTemplate",
         description="Raw user prompt template text. May contain {{input}} for variable injection.",
     )
+    enhanced_system_prompt: Optional[str] = Field(
+        default=None,
+        alias="enhancedSystemPrompt",
+        description="Enhanced system prompt for LLM-as-judge comparison.",
+    )
     is_rag: Optional[bool] = Field(False, alias="isRAG", description="Whether the prompt is a RAG prompt.")
     model_name: Optional[str] = Field(
         None,
@@ -50,6 +55,16 @@ class PromptRecommendationRequest(BaseModel):
         default=None,
         alias="testCases",
         description="Optional test cases to use instead of fetching from TrueFoundry.",
+    )
+    trace_examples: Optional[List[dict]] = Field(
+        default=None,
+        alias="traceExamples",
+        description="Real (input, output) pairs from production used for behavioral recommendation analysis.",
+    )
+    judge_system_prompt_override: Optional[str] = Field(
+        default=None,
+        alias="judgeSystemPromptOverride",
+        description="Optional override for the LLM judge system prompt.",
     )
 
     @model_validator(mode="after")

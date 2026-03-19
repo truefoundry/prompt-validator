@@ -26,9 +26,32 @@ from src.common.service.llm_prompt.prompt_service import PromptService
 from src.common.service.logging.logger import error, info
 from src.chat.graph.exact_match_evaluator import ExactMatchEvaluator
 from src.chat.graph.deepeval_evaluator import DeepEvalPromptEvaluator
+from src.chat.graph.llm_judge_evaluator import LLMJudgeEvaluator
 
 CONFIG = get_application_config()
 in_memory_checkpointer = MemorySaver()
+
+_BEHAVIORAL_REC_PROMPT = """You are a prompt engineer analyzing behavioral gaps in an AI system prompt.
+You are given:
+1. The current system prompt
+2. Real (input, output) pairs from production
+
+Your task: Identify specific instructions that are MISSING or INCORRECT in the system prompt
+that would have caused the model to produce better responses for the given examples.
+
+Rules:
+- Each recommendation must be a concrete directive (e.g. "Always...", "When X occurs, do Y")
+- Ground each in a specific example — do not write generic advice
+- Focus only on behaviors the prompt could fix — not model capability limits
+- Return 3-6 recommendations as a JSON array of strings
+
+Quality standards for your recommendations:
+- Write high-quality, general-purpose instructions that work correctly for all valid inputs, not just the observed examples
+- Do not suggest hard-coding values or workarounds that only address specific test inputs
+- Recommend instructions that implement actual logic solving the problem generally
+- Focus on principled, robust directives that follow best practices and are maintainable and extendable
+- If a trace output is fundamentally unreasonable or the task is infeasible for a prompt to fix, flag it rather than suggesting a workaround
+- Do not recommend helper scripts or prompt hacks — only real instructional improvements"""
 
 
 async def validate_fn(state, prompt_to_validate):
@@ -94,6 +117,60 @@ async def validator(state: State):
             reasoning_effort=state["request"].get("reasoning_effort"),
         )
         input_ = await evaluator.verify_tests(state)
+
+    elif state['request']['type'] == RequestType.GET_BEHAVIORAL_RECOMMENDATIONS.value:
+        system_prompt = state["request"].get("system_prompt", "")
+        if not system_prompt and prompt_to_validate:
+            # Extract system prompt text from loaded TFY prompt structure
+            messages = prompt_to_validate[0]['manifest'].messages
+            sys_msgs = [m for m in messages if getattr(m, 'role', None) == 'system']
+            if sys_msgs:
+                system_prompt = sys_msgs[0].content
+        trace_examples = state["request"].get("trace_examples") or []
+        info(f"[BEHAVIORAL_RECS] system_prompt_len={len(system_prompt)} | trace_examples={len(trace_examples)}")
+        lines = [f"System Prompt:\n{system_prompt}\n\nTrace Examples:"]
+        for idx, ex in enumerate(trace_examples, 1):
+            lines.append(f"\nExample {idx}:\nInput: {ex.get('input', '')}\nOutput: {ex.get('output', '')}")
+        formatted_content = "\n".join(lines)
+        info(f"[BEHAVIORAL_RECS] Calling LLM | content_len={len(formatted_content)}")
+        raw = await PromptService.get_prompt_response_from_text(
+            system_prompt=_BEHAVIORAL_REC_PROMPT,
+            user_prompt_template=None,
+            data={"input": formatted_content},
+            model_name=state["request"].get("model_name"),
+            max_tokens=state["request"].get("max_tokens"),
+            temperature=state["request"].get("temperature"),
+            reasoning_effort=state["request"].get("reasoning_effort"),
+        )
+        try:
+            cleaned = raw.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("```")[1]
+                if cleaned.startswith("json"):
+                    cleaned = cleaned[4:]
+            recs = json.loads(cleaned.strip())
+            if not isinstance(recs, list):
+                recs = []
+        except (json.JSONDecodeError, IndexError):
+            error(f"[BEHAVIORAL_RECS] Failed to parse LLM JSON response | raw={raw[:200]}")
+            recs = []
+        info(f"[BEHAVIORAL_RECS] Parsed {len(recs)} recommendations")
+        new_message = AIMessage(json.dumps({"behavioral_recommendations": recs}))
+        return {"messages": [new_message]}
+
+    elif state['request']['type'] == RequestType.LLM_JUDGE.value:
+        override = state["request"].get("judge_system_prompt_override")
+        info(f"[LLM_JUDGE] Starting | test_cases={len(state['request'].get('test_cases') or [])} | judge_override={'yes' if override else 'no'}")
+        evaluator = LLMJudgeEvaluator(
+            model_name=state["request"].get("model_name"),
+            max_tokens=state["request"].get("max_tokens"),
+            temperature=state["request"].get("temperature"),
+            reasoning_effort=state["request"].get("reasoning_effort"),
+            judge_system_prompt_override=override,
+        )
+        input_ = await evaluator.verify_tests(state)
+        new_message = AIMessage(json.dumps(input_))
+        return {"messages": [new_message]}
 
     new_message = await PromptService.get_prompt_response(
         prompt_template_id,

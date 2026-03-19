@@ -14,6 +14,7 @@ from ui.tabs import (
     render_exact_match_tab,
     render_recommendations_tab,
     render_sidebar,
+    render_trace_eval_tab,
 )
 
 def main() -> None:
@@ -29,11 +30,12 @@ def main() -> None:
 
     render_sidebar()
 
-    tab_recommendations, tab_enhance, tab_deepeval, tab_exact = st.tabs([
+    tab_recommendations, tab_enhance, tab_deepeval, tab_exact, tab_trace = st.tabs([
         "Get Recommendations",
         "Enhance Prompt",
         "Verify Tests (DeepEval)",
         "Verify Tests (Exact Match)",
+        "Trace Evaluation(Suggestion)",
     ])
 
     with tab_recommendations:
@@ -47,6 +49,9 @@ def main() -> None:
 
     with tab_exact:
         render_exact_match_tab()
+
+    with tab_trace:
+        render_trace_eval_tab()
 
 
 if __name__ == "__main__":

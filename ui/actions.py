@@ -1,3 +1,5 @@
+import json
+
 import requests
 import streamlit as st
 
@@ -157,6 +159,158 @@ def apply_recommendations() -> None:
             st.error(str(exc))
         except Exception as exc:
             st.error(f"Unexpected error while applying recommendations: {exc}")
+
+
+def fetch_behavioral_recommendations() -> None:
+    """Fetch behavioral recommendations from the backend using trace examples."""
+    trace_examples = st.session_state.get("rec_trace_examples")
+    if not trace_examples:
+        st.error("No trace examples selected. Please select trace rows with bad outputs first.")
+        return
+
+    # Resolve system prompt
+    if st.session_state.get("prompt_input_mode") == "Paste Prompt Text":
+        system_prompt = st.session_state.get("system_prompt_text", "").strip()
+        if not system_prompt:
+            st.error("Please enter a system prompt before analyzing failures.")
+            return
+        prompt_fields = {"systemPrompt": system_prompt}
+    else:
+        fqn = st.session_state.get("prompt_fqn", "").strip()
+        if not fqn:
+            st.error("Please enter a Prompt FQN before analyzing failures.")
+            return
+        # Try to resolve to text for the behavioral call
+        try:
+            system_prompt = get_prompt_text_by_fqn(fqn)
+        except Exception:
+            system_prompt = ""
+        if system_prompt:
+            prompt_fields = {"systemPrompt": system_prompt}
+        else:
+            prompt_fields = {"promptFQN": fqn}
+
+    reasoning = st.session_state.reasoning_effort
+    payload = {
+        "sessionId": st.session_state.session_id,
+        **prompt_fields,
+        "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
+        "type": "get_behavioral_recommendations",
+        "recommendations": None,
+        "traceExamples": trace_examples,
+    }
+
+    with st.spinner("Analyzing behavioral failures..."):
+        try:
+            data = post_chat(payload, include_grid_header=False)
+            result = extract_test_evaluation_result(data)
+            recs = []
+            if isinstance(result, dict):
+                recs = result.get("behavioral_recommendations", [])
+            if not isinstance(recs, list):
+                recs = []
+            st.session_state.behavioral_recommendations = recs
+            if recs:
+                st.success(f"Found {len(recs)} behavioral recommendation(s).")
+            else:
+                st.warning("No behavioral recommendations returned.")
+        except requests.RequestException as exc:
+            st.error(f"Failed to fetch behavioral recommendations: {exc}")
+        except Exception as exc:
+            st.error(f"Unexpected error: {exc}")
+
+
+def run_enhance_evaluation() -> None:
+    """Run LLM-as-judge evaluation comparing original vs enhanced prompt."""
+    original_prompt = st.session_state.get("enhance_eval_orig_prompt", "").strip()
+    enhanced_prompt = st.session_state.get("enhance_eval_enh_prompt", "").strip()
+
+    if not original_prompt:
+        st.error("Please enter the original system prompt.")
+        return
+    if not enhanced_prompt:
+        st.error("Please enter the enhanced system prompt.")
+        return
+
+    test_cases = st.session_state.get("enhance_eval_uploaded_tests")
+    if not test_cases:
+        st.error("Please enter a test input before running evaluation.")
+        return
+
+    judge_override = st.session_state.get("judge_prompt_override", "").strip()
+    reasoning = st.session_state.reasoning_effort
+    payload = {
+        "sessionId": st.session_state.session_id,
+        "systemPrompt": original_prompt,
+        "enhancedSystemPrompt": enhanced_prompt,
+        "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
+        "type": "llm_judge",
+        "isRAG": False,
+        "testCases": test_cases,
+        "recommendations": None,
+    }
+    if judge_override:
+        payload["judgeSystemPromptOverride"] = judge_override
+
+    with st.spinner("Running LLM-as-judge evaluation..."):
+        try:
+            data = post_chat(payload, include_grid_header=True)
+            result = extract_test_evaluation_result(data)
+            st.session_state.enhance_eval_judge_result = result
+            st.session_state.enhance_eval_api_debug_original = data
+            if result:
+                st.success("Evaluation complete.")
+            else:
+                st.warning("Evaluation ran but no result was returned.")
+        except requests.RequestException as exc:
+            st.error(f"Evaluation failed: {exc}")
+        except Exception as exc:
+            st.error(f"Unexpected error: {exc}")
+
+
+def apply_judge_recommendations() -> None:
+    """Apply judge-derived recommendations to the original prompt and store as enhanced."""
+    original_prompt = st.session_state.get("enhance_eval_orig_prompt", "").strip()
+    if not original_prompt:
+        st.error("Please enter the original system prompt before applying recommendations.")
+        return
+
+    selected = st.session_state.get("enhance_eval_judge_recs_selected", [])
+    if not selected:
+        st.error("Select at least one recommendation to apply.")
+        return
+
+    reasoning = st.session_state.reasoning_effort
+    payload = {
+        "sessionId": st.session_state.session_id,
+        "systemPrompt": original_prompt,
+        "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
+        "type": "validation",
+        "recommendations": selected,
+    }
+
+    with st.spinner("Generating enhanced prompt from judge recommendations..."):
+        try:
+            data = post_chat(payload, include_grid_header=False)
+            enhanced = extract_enhanced_prompt(data)
+            if enhanced:
+                st.session_state.enhance_eval_enh_prompt = enhanced
+                st.success("Enhanced prompt generated — check the Enhanced System Prompt field above.")
+            else:
+                st.warning("API returned no enhanced prompt.")
+        except requests.RequestException as exc:
+            st.error(f"Request failed: {exc}")
+        except Exception as exc:
+            st.error(f"Unexpected error: {exc}")
 
 
 def run_tests_with_file(tab: str) -> None:

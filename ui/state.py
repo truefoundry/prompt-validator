@@ -42,6 +42,32 @@ def init_session_state() -> None:
         "exact_match_result": None,
         "exact_match_api_debug": {},
         "exact_match_uploaded_tests": None,
+        # Enhance tab evaluation
+        "enhance_eval_orig_prompt": "",
+        "enhance_eval_enh_prompt": "",
+        "enhance_eval_orig_area": "",
+        "enhance_eval_enh_area": "",
+        "enhance_eval_input_count": 1,
+        "enhance_eval_uploaded_tests": None,
+        "enhance_eval_judge_result": None,
+        "enhance_eval_api_debug_original": {},
+        "enhance_eval_judge_recs_selected": [],
+        # Trace Evaluation tab
+        "trace_inputs": [],
+        "trace_applications": [],
+        "trace_selected_indices": [],
+        "trace_selected_fqn": "",
+        "_trace_last_autofilled_fqn": "",
+        "trace_original_system_prompt": "",
+        "trace_enhanced_system_prompt": "",
+        "trace_user_prompt_template": "",
+        "trace_llm_judge_result": None,
+        "trace_llm_judge_api_debug": {},
+        # Behavioral recommendations (F1)
+        "rec_trace_examples": None,
+        "behavioral_recommendations": [],
+        # LLM judge override (F7)
+        "judge_prompt_override": "",
     }
     for key, value in defaults.items():
         if key not in st.session_state:

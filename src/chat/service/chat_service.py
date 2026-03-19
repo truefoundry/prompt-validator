@@ -215,6 +215,7 @@ async def _process_events_and_build_response(request, events, graph, configurati
     the chatbot will ask the user if they would like to refill the prescription by confirming yes or no.    
     """
     if not last_message:
+        error(f"[GRAPH] No AI message returned | type={request.type} | session={request.session_id}")
         return PromptRecommendationResponse(
             session_id=request.session_id,
             status_code="5013",
@@ -226,21 +227,48 @@ async def _process_events_and_build_response(request, events, graph, configurati
             ),
             prompt_fqn=request.prompt_fqn
         )
+    info(f"[GRAPH] Last message length={len(last_message)} | type={request.type}")
     eval_result, prompt_result, test_evaluation_result = None, None, None
     # Return the last message from the graph, usually for Uninterrupted flows
     if request.type == RequestType.VALIDATION.value:
         if not request.recommendations:
+            info(f"[PARSE] Parsing EvaluationResult (get_recommendation)")
             eval_result = _parse_with_sanitizer(last_message, EvaluationResult)
+            if eval_result:
+                info(f"[PARSE] score={eval_result.total_score} | recs={len(eval_result.recommendations)}")
+            else:
+                error(f"[PARSE] Failed to parse EvaluationResult | raw_len={len(last_message)}")
         else:
+            info(f"[PARSE] Parsing PromptMessageList (apply_recommendation)")
             prompt_result = _parse_with_sanitizer(last_message, PromptMessageList)
-    elif request.type in [RequestType.VERIFY_TESTS.value, RequestType.VERIFY_TESTS_EXACT.value]:
+            if prompt_result:
+                info(f"[PARSE] PromptMessageList messages={len(prompt_result.prompt_messages_list)}")
+            else:
+                error(f"[PARSE] Failed to parse PromptMessageList | raw_len={len(last_message)}")
+    elif request.type in [
+        RequestType.VERIFY_TESTS.value,
+        RequestType.VERIFY_TESTS_EXACT.value,
+        RequestType.LLM_JUDGE.value,
+        RequestType.GET_BEHAVIORAL_RECOMMENDATIONS.value,
+    ]:
+        info(f"[PARSE] Parsing JSON result for type={request.type}")
         try:
             test_evaluation_result = json.loads(last_message)
+            if request.type == RequestType.GET_BEHAVIORAL_RECOMMENDATIONS.value:
+                recs = test_evaluation_result.get("behavioral_recommendations", []) if isinstance(test_evaluation_result, dict) else []
+                info(f"[PARSE] behavioral_recommendations count={len(recs)}")
+            elif request.type == RequestType.LLM_JUDGE.value:
+                summary = test_evaluation_result.get("summary", {}) if isinstance(test_evaluation_result, dict) else {}
+                info(f"[PARSE] llm_judge summary: improved={summary.get('improved_count')}/{summary.get('total_cases')}")
+            else:
+                results = test_evaluation_result.get("results", {}) if isinstance(test_evaluation_result, dict) else {}
+                info(f"[PARSE] test_evaluation tests={len(results.get('all_tests', []))}")
         except Exception:
             try:
                 test_evaluation_result = json.loads(_sanitize_json_like_output(last_message))
+                info(f"[PARSE] Parsed after sanitization")
             except Exception as e:
-                error(f"Error parsing test evaluation result: {e}")
+                error(f"[PARSE] Failed to parse JSON result: {e} | raw_len={len(last_message)}")
                 test_evaluation_result = None
 
     return PromptRecommendationResponse(
