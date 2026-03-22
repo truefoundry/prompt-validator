@@ -23,9 +23,11 @@ from .components import (
 )
 from .trace_actions import (
     build_trace_examples_for_recommendation,
+    fetch_live_trace_inputs,
     load_floqast_prompts,
     load_trace_inputs,
     run_llm_judge_on_traces,
+    run_trace_pipeline,
 )
 
 def _load_available_models() -> list[str]:
@@ -647,7 +649,7 @@ def render_exact_match_tab() -> None:
             st.json(st.session_state.exact_match_api_debug)
 
 
-_TRACE_SOURCE_OPTIONS = ("Use traces.json", "Upload file")
+_TRACE_SOURCE_OPTIONS = ("Fetch Live Traces", "Use traces.json", "Upload file")
 _JUDGE_METRICS = ["clarity", "completeness", "accuracy", "conciseness", "professional_tone", "overall"]
 
 
@@ -697,7 +699,7 @@ def _render_llm_judge_results(result: dict) -> None:
         st.write("#### LLM Suggestions for Enhanced Prompt")
         seen: set[str] = set()
         unique_recs = [r for r in all_recs if r not in seen and not seen.add(r)]  # type: ignore[func-returns-value]
-        for i, rec in enumerate(unique_recs, 1):
+        for i, rec in enumerate(unique_recs[:4], 1):
             st.markdown(f"**{i}.** {rec}")
 
     # ── Per-test breakdown ─────────────────────────────────────────────────
@@ -717,16 +719,18 @@ def _render_llm_judge_results(result: dict) -> None:
                 else f"{badge} {tr.get('test_case_name', tr.get('test_case_id', '?'))}"
             )
             with st.expander(label, expanded=False):
-                st.markdown(f"**Input:**\n\n{tr.get('input', '')}")
+                with st.expander("Input", expanded=False):
+                    st.text_area("", value=tr.get("input", ""), height=200,
+                                 disabled=True, key=f"trace_input_{tr.get('test_case_id')}")
                 col_o, col_e = st.columns(2)
                 with col_o:
-                    st.markdown("**Original Output**")
-                    st.text_area("", value=tr.get("original_output", ""), height=160,
-                                 disabled=True, key=f"trace_orig_out_{tr.get('test_case_id')}")
+                    with st.expander("Original Output", expanded=False):
+                        st.text_area("", value=tr.get("original_output", ""), height=200,
+                                     disabled=True, key=f"trace_orig_out_{tr.get('test_case_id')}")
                 with col_e:
-                    st.markdown("**Enhanced Output**")
-                    st.text_area("", value=tr.get("enhanced_output", ""), height=160,
-                                 disabled=True, key=f"trace_enh_out_{tr.get('test_case_id')}")
+                    with st.expander("Enhanced Output", expanded=False):
+                        st.text_area("", value=tr.get("enhanced_output", ""), height=200,
+                                     disabled=True, key=f"trace_enh_out_{tr.get('test_case_id')}")
 
                 if "error" not in scores:
                     metric_rows = []
@@ -767,7 +771,20 @@ def render_trace_eval_tab() -> None:
     )
 
     uploaded_content: str | None = None
-    if source_label == "Upload file":
+    if source_label == "Fetch Live Traces":
+        col_hrs, col_limit, col_fqn = st.columns([1, 1, 3])
+        live_days = col_hrs.number_input(
+            "Days back", min_value=1, max_value=90, value=1, step=1, key="trace_live_days"
+        )
+        live_limit = col_limit.number_input(
+            "Max spans", min_value=10, max_value=2000, value=200, step=50, key="trace_live_limit"
+        )
+        live_fqn = col_fqn.text_input(
+            "Prompt FQN filter (optional)",
+            placeholder="e.g. prompt-registry/...",
+            key="trace_live_fqn",
+        )
+    elif source_label == "Upload file":
         uploaded_file = st.file_uploader(
             "Upload traces JSON",
             type=["json"],
@@ -779,10 +796,17 @@ def render_trace_eval_tab() -> None:
     _SOURCE_MAP = {"Use traces.json": "traces.json", "Upload file": "upload"}
 
     if st.button("Load Traces", use_container_width=True, key="trace_load_btn"):
-        load_trace_inputs(
-            source=_SOURCE_MAP[source_label],
-            uploaded_content=uploaded_content,
-        )
+        if source_label == "Fetch Live Traces":
+            fetch_live_trace_inputs(
+                hours=int(st.session_state.get("trace_live_days", 1)) * 24,
+                limit=int(st.session_state.get("trace_live_limit", 200)),
+                fqn_filter=st.session_state.get("trace_live_fqn", "").strip() or None,
+            )
+        else:
+            load_trace_inputs(
+                source=_SOURCE_MAP[source_label],
+                uploaded_content=uploaded_content,
+            )
 
     trace_inputs: list = st.session_state.get("trace_inputs", [])
     if not trace_inputs:
@@ -820,20 +844,19 @@ def render_trace_eval_tab() -> None:
         "",
     )
 
-    # Show trace table with select checkboxes
+    # Show trace table with select checkboxes — system prompt, user input, assistant response
     display_rows = filtered[:30]
     prev_selected = set(st.session_state.get("trace_selected_indices", []))
 
     df = pd.DataFrame([
         {
             "Select": trace_inputs.index(ti) in prev_selected,
-            "span_id": ti.span_id[:12],
-            "timestamp": ti.timestamp[:19] if ti.timestamp else "",
-            "system_prompt": (getattr(ti, "system_prompt", "") or "")[:100] or "(none)",
-            "user_input": ti.user_message[:150],
-            "output": ti.trace_output[:150],
-            "latency_ms": round(ti.latency_ms, 1),
+            "model_name": ti.model_name or "(unknown)",
+            "system_prompt": getattr(ti, "system_prompt", "") or "(none)",
+            "user_input": ti.user_message or "",
+            "assistant_response": ti.trace_output or "(none)",
             "_orig_idx": trace_inputs.index(ti),
+            "span_id": ti.span_id,
         }
         for ti in display_rows
     ])
@@ -842,11 +865,14 @@ def render_trace_eval_tab() -> None:
         df,
         column_config={
             "Select": st.column_config.CheckboxColumn("Select", default=False),
-            "system_prompt": st.column_config.TextColumn("System Prompt", width="medium"),
+            "model_name": st.column_config.TextColumn("Model (trace)", width="medium"),
+            "system_prompt": st.column_config.TextColumn("System Prompt (original)", width="large"),
             "user_input": st.column_config.TextColumn("User Input", width="large"),
-            "output": st.column_config.TextColumn("Output", width="large"),
+            "assistant_response": st.column_config.TextColumn("Assistant Response", width="large"),
             "_orig_idx": None,
+            "span_id": st.column_config.TextColumn("Span ID", width="medium"),
         },
+        disabled=["model_name", "system_prompt", "user_input", "assistant_response", "span_id"],
         hide_index=True,
         use_container_width=True,
         key="trace_table_editor",
@@ -924,7 +950,32 @@ def render_trace_eval_tab() -> None:
     # ── Section D: Run ──────────────────────────────────────────────────────
     st.divider()
     if not selected_indices:
-        st.info("Select trace rows above, then run the evaluation.")
+        st.info("Select trace rows above, then run the pipeline or evaluation.")
+
+    st.write("#### Auto Pipeline")
+    st.caption(
+        "Fetches recommendations for the selected trace's system prompt, applies them to produce "
+        "an enhanced prompt, then runs LLM-as-judge using the **same model from the trace** to "
+        "compare output quality."
+    )
+    if st.button(
+        f"Run Full Pipeline on {len(selected_indices)} selected trace(s)",
+        use_container_width=True,
+        key="trace_run_pipeline_btn",
+        disabled=not selected_indices,
+        type="primary",
+    ):
+        run_trace_pipeline()
+
+    # Show pipeline recommendations if available
+    pipeline_recs = st.session_state.get("trace_pipeline_recommendations", [])
+    if pipeline_recs:
+        with st.expander(f"Recommendations applied ({len(pipeline_recs)})", expanded=False):
+            for i, rec in enumerate(pipeline_recs, 1):
+                st.markdown(f"**{i}.** {rec}")
+
+    st.write("#### Manual Judge")
+    st.caption("Use the prompts configured above (original + enhanced) to run the LLM judge directly.")
     if st.button(
         f"Run LLM Judge on {len(selected_indices)} selected trace(s)",
         use_container_width=True,

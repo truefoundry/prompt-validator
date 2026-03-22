@@ -17,7 +17,7 @@ if parent_dir not in sys.path:
 from trace.trace_parser import TraceInput, fetch_live_spans, load_spans_from_file, parse_spans_to_inputs
 
 from .api_client import post_chat
-from .extractors import extract_test_evaluation_result
+from .extractors import extract_enhanced_prompt, extract_recommendations, extract_test_evaluation_result
 
 
 @st.cache_data
@@ -93,6 +93,148 @@ def load_trace_inputs(
             st.error("traces.json not found. Run trace/fetch_trace.py first or upload a file.")
         except Exception as exc:
             st.error(f"Failed to load traces: {exc}")
+
+
+def fetch_live_trace_inputs(hours: int = 24, limit: int = 200, fqn_filter: str | None = None) -> None:
+    """Fetch live ChatCompletion spans from TrueFoundry using trace/.env credentials.
+
+    Args:
+        hours: How many hours back to fetch (default 24).
+        limit: Max spans to fetch — caps SDK pagination for fast response (default 200).
+        fqn_filter: Optional prompt FQN substring to filter client-side.
+    """
+    with st.spinner(f"Fetching live traces (last {hours // 24}d, max {limit} spans)..."):
+        try:
+            spans = fetch_live_spans(hours=hours, limit=limit, prompt_fqn_filter=fqn_filter or None)
+            if not spans:
+                st.warning("No ChatCompletion spans found in the given time range.")
+                st.session_state.trace_inputs = []
+                st.session_state.trace_selected_indices = []
+                return
+
+            inputs = parse_spans_to_inputs(spans)
+            if not inputs:
+                skip_reasons = getattr(parse_spans_to_inputs, "skip_reasons", {})
+                st.warning(
+                    f"Fetched {len(spans)} span(s) but none passed parsing. "
+                    f"Skip reasons: {skip_reasons or 'unknown'}"
+                )
+                st.session_state.trace_inputs = []
+                st.session_state.trace_selected_indices = []
+                return
+
+            fqns = sorted({ti.prompt_fqn for ti in inputs if ti.prompt_fqn})
+            st.session_state.trace_inputs = inputs
+            st.session_state.trace_selected_indices = []
+            skip_reasons = getattr(parse_spans_to_inputs, "skip_reasons", {})
+            skipped = len(spans) - len(inputs)
+            skip_note = f"  ({skipped} skipped: {skip_reasons})" if skipped else ""
+            st.success(
+                f"Fetched {len(inputs)} traces from {len(spans)} spans  |  "
+                f"{len(fqns)} prompt FQN(s) found.{skip_note}"
+            )
+        except Exception as exc:
+            st.error(f"Failed to fetch live traces: {exc}")
+
+
+def run_trace_pipeline() -> None:
+    """Run the full automated pipeline on selected trace(s):
+    Step 1 — get_recommendation on the system prompt.
+    Step 2 — apply_recommendation to produce an enhanced prompt.
+    Step 3 — run llm_judge using the same model from the trace to compare quality.
+    """
+    selected_indices = st.session_state.get("trace_selected_indices", [])
+    all_inputs: list[TraceInput] = st.session_state.get("trace_inputs", [])
+
+    if not selected_indices:
+        st.error("Select at least one trace row before running the pipeline.")
+        return
+
+    selected_inputs = [all_inputs[i] for i in selected_indices if i < len(all_inputs)]
+    if not selected_inputs:
+        st.error("No valid trace rows selected.")
+        return
+
+    original_sys = selected_inputs[0].system_prompt.strip()
+    if not original_sys:
+        st.error("The selected trace has no system prompt to enhance.")
+        return
+
+    # Use the model configured in the sidebar — not the trace's model
+    trace_model = (st.session_state.get("model_name") or "").strip() or None
+
+    reasoning = st.session_state.get("reasoning_effort", "none")
+    common = {
+        "sessionId": st.session_state.get("session_id", "123"),
+        "systemPrompt": original_sys,
+        "modelName": trace_model,
+        "maxTokens": st.session_state.get("max_tokens", 15000),
+        "temperature": st.session_state.get("temperature", 0.1),
+        "reasoningEffort": reasoning if reasoning != "none" else None,
+        "recommendations": None,
+    }
+
+    # ── Step 1: Get recommendations ─────────────────────────────────────────
+    with st.spinner("Step 1/3 — Analyzing prompt and fetching recommendations..."):
+        try:
+            rec_data = post_chat({**common, "type": "validation"}, include_grid_header=True)
+            recommendations = extract_recommendations(rec_data)
+            if not recommendations:
+                st.error("No recommendations returned. Cannot proceed with pipeline.")
+                return
+            st.session_state.trace_pipeline_recommendations = recommendations
+        except Exception as exc:
+            st.error(f"Step 1 failed (get_recommendation): {exc}")
+            return
+
+    # ── Step 2: Apply recommendations ───────────────────────────────────────
+    with st.spinner("Step 2/3 — Applying recommendations to enhance prompt..."):
+        try:
+            enh_data = post_chat(
+                {**common, "type": "validation", "recommendations": recommendations},
+                include_grid_header=False,
+            )
+            enhanced_prompt = extract_enhanced_prompt(enh_data)
+            if not enhanced_prompt:
+                st.error("No enhanced prompt returned. Cannot proceed with pipeline.")
+                return
+            st.session_state.trace_original_system_prompt = original_sys
+            st.session_state.trace_enhanced_system_prompt = enhanced_prompt
+        except Exception as exc:
+            st.error(f"Step 2 failed (apply_recommendation): {exc}")
+            return
+
+    # ── Step 3: LLM judge comparison ────────────────────────────────────────
+    test_cases = [
+        {
+            "test_case_id": str(i),
+            "test_case_name": f"Trace {ti.span_id[:8]} — {ti.user_message[:40]}",
+            "data": {"input": ti.user_message},
+            "expected_output": "",
+        }
+        for i, ti in enumerate(selected_inputs)
+    ]
+
+    with st.spinner("Step 3/3 — Running LLM judge to compare original vs enhanced..."):
+        try:
+            judge_data = post_chat({
+                "sessionId": st.session_state.get("session_id", "123"),
+                "type": "llm_judge",
+                "systemPrompt": original_sys,
+                "enhancedSystemPrompt": enhanced_prompt,
+                "modelName": trace_model,
+                "maxTokens": st.session_state.get("max_tokens", 15000),
+                "temperature": st.session_state.get("temperature", 0.1),
+                "reasoningEffort": reasoning if reasoning != "none" else None,
+                "recommendations": None,
+                "testCases": test_cases,
+            }, include_grid_header=False)
+            result = extract_test_evaluation_result(judge_data)
+            st.session_state.trace_llm_judge_result = result
+            st.session_state.trace_llm_judge_api_debug = judge_data
+            st.success("Pipeline complete. Scroll down to see results.")
+        except Exception as exc:
+            st.error(f"Step 3 failed (llm_judge): {exc}")
 
 
 def build_trace_examples_for_recommendation(

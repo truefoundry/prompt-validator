@@ -38,6 +38,7 @@ def fetch_live_spans(
     prompt_fqn_filter: str | None = None,
     start_time: datetime | None = None,
     end_time: datetime | None = None,
+    limit: int = 200,
 ) -> list[dict]:
     """Fetch spans from TFY using credentials in trace/.env.
 
@@ -46,20 +47,35 @@ def fetch_live_spans(
         prompt_fqn_filter: Base prompt FQN to filter client-side (substring match).
         start_time: Explicit start datetime (UTC). If None, derived from hours.
         end_time: Explicit end datetime (UTC). If None, defaults to now.
+        limit: Max number of spans to fetch. Caps SDK pagination so the call
+               returns quickly instead of exhausting all pages.
 
     Note: FQN filtering is done client-side after fetching because the TFY API
     does not reliably support string operators on tfy.prompt_version_fqn.
     """
+    # Read credentials directly from trace/.env to avoid using the global
+    # truefoundry singleton which may have been initialised with different creds.
     env_path = os.path.join(os.path.dirname(__file__), ".env")
     try:
-        from dotenv import load_dotenv
-        load_dotenv(dotenv_path=env_path)
+        from dotenv import dotenv_values
+        env_vals = dotenv_values(env_path)
     except ImportError:
-        pass
+        import os as _os
+        env_vals = {}
 
-    from truefoundry import client  # type: ignore
-    from truefoundry_sdk import SortDirection, SpanAttributeFilter
+    tfy_host = env_vals.get("TFY_HOST") or os.environ.get("TFY_HOST", "")
+    tfy_api_key = env_vals.get("TFY_API_KEY") or os.environ.get("TFY_API_KEY", "")
+
+    if not tfy_host:
+        raise ValueError("TFY_HOST not found in trace/.env")
+    if not tfy_api_key:
+        raise ValueError("TFY_API_KEY not found in trace/.env")
+
+    from truefoundry_sdk import TrueFoundry, SortDirection, SpanAttributeFilter
     from truefoundry_sdk.types.span_attribute_filter_operator import SpanAttributeFilterOperator
+
+    # Create a fresh client scoped to the FloQast tenant credentials
+    tfy_client = TrueFoundry(base_url=tfy_host, api_key=tfy_api_key)
 
     now = datetime.now(timezone.utc)
     if end_time is None:
@@ -89,12 +105,13 @@ def fetch_live_spans(
             )
         )
 
-    raw_spans = client.traces.query_spans(
+    raw_spans = tfy_client.traces.query_spans(
         data_routing_destination="default",
         start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         filters=filters,
         sort_direction=SortDirection.DESC,
+        limit=limit,
     )
     spans = [span.model_dump() for span in raw_spans]
     logger.info(f"[TRACE_FETCH] Raw spans returned: {len(spans)}")
@@ -103,10 +120,34 @@ def fetch_live_spans(
 
 
 def _extract_user_message(messages: list[dict]) -> str | None:
-    """Return the content of the last user-role message."""
+    """Return the combined content of all user-role messages, skipping unresolved template placeholders.
+
+    Some prompts have multiple user turns (data summary, transactions, instructions, etc.).
+    The last user turn is often a short template like "Translate to {{language}} language."
+    which may still contain unresolved {{variable}} placeholders — those are skipped.
+    All resolved user messages are joined so the full input context is preserved.
+    """
+    import re
     user_msgs = [m for m in messages if m.get("role") == "user"]
     if not user_msgs:
         return None
+
+    resolved = []
+    for m in user_msgs:
+        content = str(m.get("content", "")).strip()
+        if not content:
+            continue
+        # Skip messages that are purely unresolved template placeholders
+        # (entire content is one or more {{variable}} tokens with no other text)
+        stripped = re.sub(r"\{\{[^}]+\}\}", "", content).strip()
+        if not stripped:
+            continue
+        resolved.append(content)
+
+    if resolved:
+        return "\n\n".join(resolved)
+
+    # All messages were unresolved templates — fall back to last user message
     return str(user_msgs[-1].get("content", ""))
 
 
@@ -174,8 +215,14 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
                     span_name = span_name[len(prefix):]
                     break
             span_name = span_name.strip()
-            # Skip spans whose only identifier is a bare model-provider name
-            if not span_name or any(span_name.startswith(p) for p in _MODEL_PROVIDER_PREFIXES):
+            # Skip spans whose only identifier is a bare model-provider name or
+            # anything that lacks ":" — real prompt FQNs always contain ":" e.g.
+            # "chat_prompt:workspace/repo/name:version"
+            if (
+                not span_name
+                or ":" not in span_name
+                or any(span_name.startswith(p) for p in _MODEL_PROVIDER_PREFIXES)
+            ):
                 _skip("no_prompt_fqn_bare_model")
                 continue
             prompt_fqn = span_name

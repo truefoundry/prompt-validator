@@ -63,6 +63,7 @@ def init_session_state() -> None:
         "trace_user_prompt_template": "",
         "trace_llm_judge_result": None,
         "trace_llm_judge_api_debug": {},
+        "trace_pipeline_recommendations": [],
         # Behavioral recommendations (F1)
         "rec_trace_examples": None,
         "behavioral_recommendations": [],
