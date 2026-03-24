@@ -1,11 +1,11 @@
 [project]
 name = "prompt-validator"
 version = "0.1.0"
-description = "Add your description here"
+description = "LLM prompt evaluation and optimization tool with trace analysis, DeepEval metrics, and LLM-as-judge"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "deepeval>=3.3.0",
+    "deepeval>=3.9.2",
     "fastapi>=0.116.1",
     "langchain>=0.3.26",
     "langchain-community>=0.3.27",
@@ -14,6 +14,7 @@ dependencies = [
     "langchain-openai>=0.3.28",
     "langgraph>=0.5.3",
     "langgraph-checkpoint-postgres>=2.0.23",
+    "nest_asyncio>=1.6.0",
     "pydantic-settings>=2.10.1",
     "redis>=6.2.0",
     "scikit-learn>=1.7.1",
