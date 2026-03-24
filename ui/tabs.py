@@ -1,14 +1,14 @@
+import os
 import streamlit as st
 
 import json
-import os
-from datetime import date
 
 from .actions import (
     apply_judge_recommendations,
     apply_recommendations,
-    fetch_behavioral_recommendations,
     fetch_recommendations,
+    generate_overall_suggestions,
+    run_deepeval_prompt_metrics,
     run_enhance_evaluation,
     run_tests_with_file,
 )
@@ -22,7 +22,6 @@ from .components import (
     render_selected_recommendations_editor,
 )
 from .trace_actions import (
-    build_trace_examples_for_recommendation,
     fetch_live_trace_inputs,
     load_floqast_prompts,
     load_trace_inputs,
@@ -33,7 +32,8 @@ from .trace_actions import (
 def _load_available_models() -> list[str]:
     """Load model names from api_response.json."""
     try:
-        json_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "api_response.json")
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        json_path = os.path.join(project_root, "api_response.json")
         with open(json_path) as f:
             data = json.load(f)
         for entry in data.get("data", []):
@@ -106,18 +106,29 @@ def render_sidebar() -> None:
             value=st.session_state.session_id,
         )
         current_model = st.session_state.model_name or ""
-        model_options = [""] + _AVAILABLE_MODELS
-        if current_model and current_model not in model_options:
-            model_options = [current_model] + model_options
-        current_idx = model_options.index(current_model) if current_model in model_options else 0
-        selected_model = st.selectbox(
+        filter_text = st.text_input(
             "Model Name (Optional)",
-            options=model_options,
-            index=current_idx,
-            placeholder="Type to filter models…",
-            help="Current configured model. Start typing to filter the list.",
+            value=current_model,
+            placeholder="Type to search models…",
+            help="Type any substring to filter and pick from the dropdown.",
+            key="sidebar_model_filter",
         )
-        st.session_state.model_name = selected_model or ""
+        if filter_text.strip():
+            filtered_models = [m for m in _AVAILABLE_MODELS if filter_text.lower() in m.lower()]
+            if filtered_models:
+                picked = st.selectbox(
+                    "Matching models",
+                    options=filtered_models,
+                    index=0,
+                    key="sidebar_model_pick",
+                    label_visibility="collapsed",
+                )
+                st.session_state.model_name = picked
+            else:
+                st.caption("No matching models — typed value will be used as-is.")
+                st.session_state.model_name = filter_text.strip()
+        else:
+            st.session_state.model_name = ""
 
         st.session_state.max_tokens = st.number_input(
             "Max Tokens",
@@ -189,7 +200,7 @@ def render_recommendations_tab() -> None:
 
     _render_prompt_input("prompt_input_mode", "prompt_fqn", "system_prompt_text", "user_prompt_template_text")
 
-    if st.button("Fetch Prompt & Get Recommendations", use_container_width=True):
+    if st.button("Fetch Prompt & Get Recommendations", width="stretch"):
         fetch_recommendations()
 
     st.divider()
@@ -214,75 +225,181 @@ def render_recommendations_tab() -> None:
     with col_right:
         render_recommendation_checkboxes()
 
-    # ── Behavioral Recommendations (F1) ─────────────────────────────────────
+
+
+_PRIORITY_CONFIG = {
+    "HIGH":   {"color": "#e74c3c", "icon": "🔴"},
+    "MEDIUM": {"color": "#f39c12", "icon": "🟡"},
+    "LOW":    {"color": "#27ae60", "icon": "🟢"},
+}
+
+
+def _render_overall_suggestions(result: dict, selected_key: str = "trace_suggestions_selected") -> None:
     st.divider()
-    st.write("### Behavioral Recommendations (from traces)")
-    st.caption(
-        "Select trace rows showing bad outputs, then click 'Analyze Failures' to identify "
-        "missing or incorrect instructions in the system prompt."
-    )
+    st.write("#### Suggestions")
 
-    trace_inputs = st.session_state.get("trace_inputs", [])
-    if not trace_inputs:
-        st.info("Load traces in the Trace Evaluation tab first to enable behavioral analysis.")
-    else:
-        import pandas as pd
+    analysis = result.get("overall_analysis", "")
+    if analysis:
+        st.info(analysis)
 
-        display_rows = trace_inputs[:10]
-        rec_df = pd.DataFrame(
-            [
-                {
-                    "Select": False,
-                    "span_id": ti.span_id[:12],
-                    "input": ti.user_message[:100],
-                    "output": ti.trace_output[:100],
-                    "_orig_idx": trace_inputs.index(ti),
-                }
-                for ti in display_rows
-            ]
+    suggestions = result.get("suggestions", [])
+    if not suggestions:
+        st.warning("No suggestions returned.")
+        return
+
+    # Sort by priority
+    priority_order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+    suggestions = sorted(suggestions, key=lambda s: priority_order.get(s.get("priority", "LOW"), 3))
+
+    st.caption("Select suggestions to apply to the enhanced prompt, then click **Apply Selected**.")
+
+    selected_texts: list[str] = []
+    for i, s in enumerate(suggestions):
+        priority = s.get("priority", "LOW").upper()
+        cfg = _PRIORITY_CONFIG.get(priority, _PRIORITY_CONFIG["LOW"])
+        title = s.get("title", "")
+        suggestion_text = s.get("suggestion", "")
+        rationale = s.get("rationale", "")
+
+        col_check, col_card = st.columns([0.04, 0.96])
+        checked = col_check.checkbox("", key=f"{selected_key}_{i}", label_visibility="collapsed")
+        if checked:
+            selected_texts.append(suggestion_text)
+
+        col_card.markdown(
+            f"""<div style="border-left: 4px solid {cfg['color']}; padding: 10px 14px; border-radius: 6px; margin-bottom: 6px;">
+<span style="font-size:0.72rem; font-weight:700; color:{cfg['color']}; text-transform:uppercase; letter-spacing:0.05em;">{cfg['icon']} {priority}</span>
+<div style="font-weight:600; margin: 4px 0 4px 0; font-size:0.93rem;">{title}</div>
+<div style="font-size:0.88rem; margin-bottom:5px;">{suggestion_text}</div>
+<div style="font-size:0.78rem; opacity:0.65;"><em>{rationale}</em></div>
+</div>""",
+            unsafe_allow_html=True,
         )
-        rec_edited = st.data_editor(
-            rec_df,
-            column_config={
-                "Select": st.column_config.CheckboxColumn("Select", default=False),
-                "input": st.column_config.TextColumn("Input", width="large"),
-                "output": st.column_config.TextColumn("Output", width="large"),
-                "_orig_idx": None,
-            },
-            hide_index=True,
-            use_container_width=True,
-            key="rec_trace_table_editor",
-        )
 
-        selected_rec_indices = [
-            int(row["_orig_idx"])
-            for _, row in rec_edited.iterrows()
-            if row["Select"]
-        ]
+    st.session_state[selected_key] = selected_texts
 
-        if st.button("Analyze Failures", key="analyze_failures_btn", use_container_width=True):
-            if not selected_rec_indices:
-                st.error("Select at least one trace row before analyzing.")
+    if selected_texts:
+        st.caption(f"{len(selected_texts)} suggestion(s) selected")
+        if st.button("Apply Selected → Refine Enhanced Prompt", key=f"{selected_key}_apply_btn", type="primary"):
+            _apply_suggestions_to_trace_prompt(selected_texts)
+
+
+def _apply_suggestions_to_trace_prompt(suggestions: list[str]) -> None:
+    """Apply selected suggestions: enhanced prompt becomes new original, suggestions applied on top."""
+    from .actions import apply_recommendations as _apply
+    from .api_client import post_chat
+    from .extractors import extract_enhanced_prompt
+
+    current_enhanced = st.session_state.get("trace_enhanced_system_prompt", "").strip()
+    if not current_enhanced:
+        st.error("No enhanced prompt found — run the pipeline or judge first.")
+        return
+
+    # Promote enhanced → original so the next iteration starts from it
+    st.session_state.trace_original_system_prompt = current_enhanced
+
+    reasoning = st.session_state.reasoning_effort
+    payload = {
+        "sessionId": st.session_state.session_id,
+        "systemPrompt": current_enhanced,
+        "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": st.session_state.temperature,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
+        "type": "validation",
+        "recommendations": suggestions,
+    }
+    with st.spinner("Applying suggestions to generate refined prompt..."):
+        try:
+            import requests
+            data = post_chat(payload, include_grid_header=False)
+            refined = extract_enhanced_prompt(data)
+            if refined:
+                st.session_state.trace_enhanced_system_prompt = refined
+                # Clear previous results so user re-runs fresh
+                st.session_state.trace_llm_judge_result = None
+                st.session_state.trace_suggestions_result = None
+                st.session_state.trace_deepeval_metrics_result = None
+                st.success("Refined prompt applied. Original → previous enhanced. Run the judge again to measure improvement.")
+                st.rerun()
             else:
-                examples = build_trace_examples_for_recommendation(trace_inputs, selected_rec_indices)
-                st.session_state.rec_trace_examples = examples
-                fetch_behavioral_recommendations()
+                st.warning("API returned no refined prompt.")
+        except requests.RequestException as exc:
+            st.error(f"Request failed: {exc}")
+        except Exception as exc:
+            st.error(f"Unexpected error: {exc}")
 
-    behavioral_recs = st.session_state.get("behavioral_recommendations", [])
-    if behavioral_recs:
-        st.write("**Behavioral Recommendations:**")
-        behavioral_selected = []
-        for i, rec in enumerate(behavioral_recs):
-            if st.checkbox(rec, key=f"behavioral_rec_{i}"):
-                behavioral_selected.append(rec)
 
-        # Merge behavioral selections into selected_recommendations for apply step
-        existing = st.session_state.get("selected_recommendations", [])
-        merged = list(existing)
-        for rec in behavioral_selected:
-            if rec not in merged:
-                merged.append(rec)
-        st.session_state.selected_recommendations = merged
+_METRIC_LABELS = {
+    "answer_relevancy": "Answer Relevancy",
+    "geval": "GEval (Quality)",
+    "prompt_alignment": "Prompt Alignment",
+    "pii": "PII Leakage",
+}
+
+# For pii: lower score = better (less pii)
+_LOWER_IS_BETTER = {"pii"}
+
+
+def _render_deepeval_prompt_metrics(result: dict) -> None:
+    summary = result.get("summary", {})
+    per_test = result.get("per_test", [])
+    metrics_run = result.get("metrics_run", [])
+
+    st.write("#### DeepEval Metrics Results")
+
+    # Summary table
+    header = st.columns([2, 1, 1, 1])
+    header[0].markdown("**Metric**")
+    header[1].markdown("**Original avg**")
+    header[2].markdown("**Enhanced avg**")
+    header[3].markdown("**Delta**")
+
+    for key in metrics_run:
+        s = summary.get(key, {})
+        orig = s.get("original_avg")
+        enh = s.get("enhanced_avg")
+        delta = s.get("delta")
+        lower_better = key in _LOWER_IS_BETTER
+
+        cols = st.columns([2, 1, 1, 1])
+        cols[0].write(_METRIC_LABELS.get(key, key))
+        cols[1].write(f"{orig:.3f}" if orig is not None else "—")
+        cols[2].write(f"{enh:.3f}" if enh is not None else "—")
+
+        if delta is not None:
+            improved = delta < 0 if lower_better else delta > 0
+            regressed = delta > 0 if lower_better else delta < 0
+            delta_str = f"{delta:+.3f}"
+            if improved:
+                cols[3].markdown(f"**:green[{delta_str}]**")
+            elif regressed:
+                cols[3].markdown(f"**:red[{delta_str}]**")
+            else:
+                cols[3].write(delta_str)
+        else:
+            cols[3].write("—")
+
+    # Per-test breakdown
+    if per_test:
+        with st.expander(f"Per-test breakdown ({len(per_test)} cases)", expanded=False):
+            for i, tc in enumerate(per_test):
+                st.markdown(f"**Test {i + 1}:** {tc['input'][:100]}{'…' if len(tc['input']) > 100 else ''}")
+                for key in metrics_run:
+                    scores = tc["scores"].get(key, {})
+                    orig_s = scores.get("original")
+                    enh_s = scores.get("enhanced")
+                    orig_r = scores.get("original_reason", "")
+                    enh_r = scores.get("enhanced_reason", "")
+                    label = _METRIC_LABELS.get(key, key)
+                    c1, c2 = st.columns(2)
+                    c1.caption(f"**{label} — Original:** {f'{orig_s:.3f}' if orig_s is not None else '—'}")
+                    if orig_r:
+                        c1.caption(orig_r)
+                    c2.caption(f"**{label} — Enhanced:** {f'{enh_s:.3f}' if enh_s is not None else '—'}")
+                    if enh_r:
+                        c2.caption(enh_r)
+                st.divider()
 
 
 def render_enhance_tab() -> None:
@@ -297,7 +414,7 @@ def render_enhance_tab() -> None:
 
     render_selected_recommendations_editor()
 
-    if st.button("Apply Recommendations & Enhance", use_container_width=True):
+    if st.button("Apply Recommendations & Enhance", width="stretch"):
         apply_recommendations()
 
     st.divider()
@@ -320,12 +437,13 @@ def render_enhance_tab() -> None:
                 data=st.session_state.enhanced_prompt,
                 file_name="enhanced_prompt.txt",
                 mime="text/plain",
-                use_container_width=True,
+                width="stretch",
+                key="download_enhanced_prompt_tab",
             )
         else:
-            render_diff(st.session_state.original_prompt, st.session_state.enhanced_prompt)
+            render_diff(st.session_state.original_prompt, st.session_state.enhanced_prompt, key="diff_enhance_a")
     else:
-        render_diff(st.session_state.original_prompt, st.session_state.enhanced_prompt)
+        render_diff(st.session_state.original_prompt, st.session_state.enhanced_prompt, key="diff_enhance_b")
 
     with st.expander("Debug: Last API Response", expanded=False):
         st.json(st.session_state.api_response_debug)
@@ -343,12 +461,12 @@ def render_enhance_tab() -> None:
 
     col_btn_orig, col_btn_enh = st.columns(2)
     with col_btn_orig:
-        if st.button("Use session original prompt", key="eval_use_orig_btn", use_container_width=True):
+        if st.button("Use session original prompt", key="eval_use_orig_btn", width="stretch"):
             val = st.session_state.get("original_prompt", "")
             st.session_state.enhance_eval_orig_prompt = val
             st.session_state.enhance_eval_orig_area = val
     with col_btn_enh:
-        if st.button("Use session enhanced prompt", key="eval_use_enh_btn", use_container_width=True):
+        if st.button("Use session enhanced prompt", key="eval_use_enh_btn", width="stretch"):
             val = st.session_state.get("enhanced_prompt", "")
             st.session_state.enhance_eval_enh_prompt = val
             st.session_state.enhance_eval_enh_area = val
@@ -402,7 +520,7 @@ def render_enhance_tab() -> None:
 
 
 
-    if st.button("Run Evaluation", use_container_width=True, key="enhance_eval_run_btn"):
+    if st.button("Run Evaluation", width="stretch", key="enhance_eval_run_btn"):
         valid_inputs = [
             st.session_state.get(f"enhance_eval_input_{i}", "").strip()
             for i in range(st.session_state.get("enhance_eval_input_count", 1))
@@ -490,34 +608,111 @@ def render_enhance_tab() -> None:
         with st.expander("Debug: API Response", expanded=False):
             st.json(st.session_state.get("enhance_eval_api_debug_original", {}))
 
-        # ── Recommendations from Judge ────────────────────────────────────────
-        all_differences: list[str] = []
-        for tr in test_results:
-            scores = tr.get("scores", {})
-            for d in scores.get("prompt_recommendations", []):
-                if d and d not in all_differences:
-                    all_differences.append(d)
+    # ── Arena Evaluation ─────────────────────────────────────────────────────
+    st.divider()
+    st.write("### Arena Comparison (DeepEval)")
+    st.caption(
+        "Uses DeepEval's `ArenaGEval` to pick a winner per test case between "
+        "original and enhanced prompt. Requires both prompts to be set above."
+    )
 
-        if all_differences:
-            st.divider()
-            st.write("#### Recommendations from LLM Judge")
-            st.caption(
-                "Actionable prompt instructions derived by analyzing your test inputs and both outputs. "
-                "Select the ones you want to apply to the original prompt."
-            )
-            selected_recs = []
-            for i, diff in enumerate(all_differences):
-                if st.checkbox(diff, key=f"judge_rec_{i}"):
-                    selected_recs.append(diff)
-            st.session_state.enhance_eval_judge_recs_selected = selected_recs
+    arena_criteria = st.text_input(
+        "Criteria",
+        value=st.session_state.get("arena_eval_criteria", ""),
+        key="arena_criteria_input",
+        help="Describe what makes one response better than the other.",
+    )
+    st.session_state.arena_eval_criteria = arena_criteria
 
-            if st.button(
-                "Apply Selected Recommendations → Generate Enhanced Prompt",
-                use_container_width=True,
-                key="apply_judge_recs_btn",
-                disabled=not selected_recs,
-            ):
-                apply_judge_recommendations()
+    arena_orig = st.session_state.get("enhance_eval_orig_prompt", "").strip()
+    arena_enh = st.session_state.get("enhance_eval_enh_prompt", "").strip()
+    arena_inputs = [
+        st.session_state.get(f"enhance_eval_input_{i}", "").strip()
+        for i in range(st.session_state.get("enhance_eval_input_count", 1))
+    ]
+    arena_inputs = [x for x in arena_inputs if x]
+    arena_test_cases = [
+        {"data": {"input": inp}, "expected_output": ""}
+        for inp in arena_inputs
+    ]
+
+    arena_disabled = not (arena_orig and arena_enh and arena_test_cases)
+    if arena_disabled:
+        st.info("Fill in both prompts and at least one test input above to enable Arena Compare.")
+
+    if st.button("Run Arena Compare", width="stretch", key="arena_run_btn", disabled=arena_disabled):
+        from src.chat.graph.arena_evaluator import run_arena_comparison
+        with st.spinner(f"Running Arena comparison on {len(arena_test_cases)} test case(s)..."):
+            try:
+                arena_result = run_arena_comparison(
+                    original_prompt=arena_orig,
+                    enhanced_prompt=arena_enh,
+                    test_cases=arena_test_cases,
+                    criteria=arena_criteria,
+                    model_name=st.session_state.get("model_name"),
+                    max_tokens=st.session_state.get("max_tokens"),
+                    temperature=st.session_state.get("temperature"),
+                )
+                st.session_state.arena_eval_result = arena_result
+                st.success("Arena comparison complete.")
+            except Exception as e:
+                st.error(f"Arena comparison failed: {e}")
+
+    arena_result = st.session_state.get("arena_eval_result")
+    if arena_result:
+        _render_arena_results(arena_result)
+
+
+def _render_arena_results(result: dict) -> None:
+    wins = result.get("wins", {})
+    win_rate = result.get("win_rate", 0.0)
+    per_test = result.get("per_test", [])
+    total = len(per_test)
+
+    enhanced_wins = wins.get("Enhanced", 0)
+    original_wins = wins.get("Original", 0)
+
+    if enhanced_wins > original_wins:
+        headline = f"🏆 Enhanced won **{enhanced_wins} / {total}** tests ({win_rate:.0%})"
+    elif original_wins > enhanced_wins:
+        headline = f"⚠️ Original won **{original_wins} / {total}** tests ({1 - win_rate:.0%})"
+    else:
+        headline = f"🤝 Tied — **{enhanced_wins} / {total}** wins each"
+
+    st.markdown(headline)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Original Wins", original_wins)
+    col2.metric("Enhanced Wins", enhanced_wins)
+    col3.metric("Inconclusive", wins.get("Inconclusive", total - enhanced_wins - original_wins))
+
+    st.write("#### Per-Test Results")
+    for i, t in enumerate(per_test):
+        winner = t.get("winner", "Unknown")
+        if winner == "Enhanced":
+            badge = "🏆 Enhanced"
+        elif winner == "Original":
+            badge = "❌ Original"
+        else:
+            badge = f"⚠️ {winner}"
+
+        with st.expander(f"Test {i + 1} — {badge}", expanded=False):
+            st.markdown(f"**Reason:** {t.get('reason', '—')}")
+            col_o, col_e = st.columns(2)
+            with col_o:
+                st.write("**Original Output**")
+                st.text_area(
+                    "orig", value=t.get("original_output", ""), height=150,
+                    disabled=True, key=f"arena_orig_out_{i}", label_visibility="collapsed",
+                )
+            with col_e:
+                st.write("**Enhanced Output**")
+                st.text_area(
+                    "enh", value=t.get("enhanced_output", ""), height=150,
+                    disabled=True, key=f"arena_enh_out_{i}", label_visibility="collapsed",
+                )
+            with st.expander("Input", expanded=False):
+                st.text(t.get("input", ""))
 
 
 _DEEPEVAL_EXAMPLE = """```json
@@ -617,7 +812,7 @@ def render_deepeval_tab() -> None:
 
     _render_file_uploader("deepeval")
 
-    if st.button("Run DeepEval Tests", use_container_width=True):
+    if st.button("Run DeepEval Tests", width="stretch"):
         run_tests_with_file("deepeval")
 
     if st.session_state.deepeval_result:
@@ -639,7 +834,7 @@ def render_exact_match_tab() -> None:
 
     _render_file_uploader("exact_match")
 
-    if st.button("Run Exact Match Tests", use_container_width=True):
+    if st.button("Run Exact Match Tests", width="stretch"):
         run_tests_with_file("exact_match")
 
     if st.session_state.exact_match_result:
@@ -685,7 +880,7 @@ def _render_llm_judge_results(result: dict) -> None:
                 "Enhanced": f"{e:.3f}" if e is not None else "—",
                 "Δ Delta": f"{d:+.3f}" if d is not None else "—",
             })
-        st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
     # ── Prompt recommendations (aggregated across all test cases) ───────────
     all_recs: list[str] = []
@@ -720,17 +915,20 @@ def _render_llm_judge_results(result: dict) -> None:
             )
             with st.expander(label, expanded=False):
                 with st.expander("Input", expanded=False):
-                    st.text_area("", value=tr.get("input", ""), height=200,
-                                 disabled=True, key=f"trace_input_{tr.get('test_case_id')}")
+                    st.text_area("Input", value=tr.get("input", ""), height=200,
+                                 disabled=True, key=f"trace_input_{tr.get('test_case_id')}",
+                                 label_visibility="collapsed")
                 col_o, col_e = st.columns(2)
                 with col_o:
                     with st.expander("Original Output", expanded=False):
-                        st.text_area("", value=tr.get("original_output", ""), height=200,
-                                     disabled=True, key=f"trace_orig_out_{tr.get('test_case_id')}")
+                        st.text_area("Original Output", value=tr.get("original_output", ""), height=200,
+                                     disabled=True, key=f"trace_orig_out_{tr.get('test_case_id')}",
+                                     label_visibility="collapsed")
                 with col_e:
                     with st.expander("Enhanced Output", expanded=False):
-                        st.text_area("", value=tr.get("enhanced_output", ""), height=200,
-                                     disabled=True, key=f"trace_enh_out_{tr.get('test_case_id')}")
+                        st.text_area("Enhanced Output", value=tr.get("enhanced_output", ""), height=200,
+                                     disabled=True, key=f"trace_enh_out_{tr.get('test_case_id')}",
+                                     label_visibility="collapsed")
 
                 if "error" not in scores:
                     metric_rows = []
@@ -742,7 +940,7 @@ def _render_llm_judge_results(result: dict) -> None:
                             "Original": f"{o:.2f}" if o is not None else "—",
                             "Enhanced": f"{e:.2f}" if e is not None else "—",
                         })
-                    st.dataframe(pd.DataFrame(metric_rows), hide_index=True, use_container_width=True)
+                    st.dataframe(pd.DataFrame(metric_rows), hide_index=True, width="stretch")
 
                 if scores.get("improvement_summary"):
                     st.info(scores["improvement_summary"])
@@ -753,8 +951,6 @@ def _render_llm_judge_results(result: dict) -> None:
 
 
 def render_trace_eval_tab() -> None:
-    import pandas as pd
-
     st.subheader("Trace Evaluation")
     st.caption(
         "Load real production traces, group by prompt, then compare original vs enhanced prompt quality using LLM-as-judge."
@@ -795,7 +991,7 @@ def render_trace_eval_tab() -> None:
 
     _SOURCE_MAP = {"Use traces.json": "traces.json", "Upload file": "upload"}
 
-    if st.button("Load Traces", use_container_width=True, key="trace_load_btn"):
+    if st.button("Load Traces", width="stretch", key="trace_load_btn"):
         if source_label == "Fetch Live Traces":
             fetch_live_trace_inputs(
                 hours=int(st.session_state.get("trace_live_days", 1)) * 24,
@@ -844,53 +1040,91 @@ def render_trace_eval_tab() -> None:
         "",
     )
 
-    # Show trace table with select checkboxes — system prompt, user input, assistant response
+    import pandas as pd
+
     display_rows = filtered[:30]
-    prev_selected = set(st.session_state.get("trace_selected_indices", []))
+    all_display_indices = [trace_inputs.index(ti) for ti in display_rows]
 
-    df = pd.DataFrame([
-        {
-            "Select": trace_inputs.index(ti) in prev_selected,
-            "model_name": ti.model_name or "(unknown)",
-            "system_prompt": getattr(ti, "system_prompt", "") or "(none)",
-            "user_input": ti.user_message or "",
-            "assistant_response": ti.trace_output or "(none)",
-            "_orig_idx": trace_inputs.index(ti),
-            "span_id": ti.span_id,
-        }
-        for ti in display_rows
-    ])
+    # Build display DataFrame with truncated text for the table view
+    def _trunc(s: str, n: int = 100) -> str:
+        s = (s or "").replace("\n", " ")
+        return s[:n] + "…" if len(s) > n else s
 
-    edited = st.data_editor(
-        df,
-        column_config={
-            "Select": st.column_config.CheckboxColumn("Select", default=False),
-            "model_name": st.column_config.TextColumn("Model (trace)", width="medium"),
-            "system_prompt": st.column_config.TextColumn("System Prompt (original)", width="large"),
-            "user_input": st.column_config.TextColumn("User Input", width="large"),
-            "assistant_response": st.column_config.TextColumn("Assistant Response", width="large"),
-            "_orig_idx": None,
-            "span_id": st.column_config.TextColumn("Span ID", width="medium"),
-        },
-        disabled=["model_name", "system_prompt", "user_input", "assistant_response", "span_id"],
+    table_data = []
+    for i, ti in enumerate(display_rows):
+        orig_idx = trace_inputs.index(ti)
+        table_data.append({
+            "#": i + 1,
+            "User Input": _trunc(ti.user_message or "", 120),
+            "Assistant Response": _trunc(ti.trace_output or "", 100),
+            "Model": _trunc(ti.model_name or "(unknown)", 40),
+            "Span ID": (ti.span_id or "")[:20],
+            "_orig_idx": orig_idx,
+        })
+
+    df_display = pd.DataFrame(table_data)
+
+    st.dataframe(
+        df_display.drop(columns=["_orig_idx"]),
+        width="stretch",
         hide_index=True,
-        use_container_width=True,
-        key="trace_table_editor",
+        column_config={
+            "#": st.column_config.NumberColumn("#", width="small"),
+            "User Input": st.column_config.TextColumn("User Input", width="large"),
+            "Assistant Response": st.column_config.TextColumn("Assistant Response", width="large"),
+            "Model": st.column_config.TextColumn("Model", width="medium"),
+            "Span ID": st.column_config.TextColumn("Span ID", width="medium"),
+        },
     )
 
-    selected_indices = [int(row["_orig_idx"]) for _, row in edited.iterrows() if row["Select"]]
+    # Multiselect for picking traces by row number — instant, no rerender per click
+    row_options = [f"#{r['#']}  {_trunc(display_rows[r['#']-1].user_message or '', 80)}" for r in table_data]
+    row_option_to_orig = {opt: table_data[i]["_orig_idx"] for i, opt in enumerate(row_options)}
+
+    prev_selected_orig = set(st.session_state.get("trace_selected_indices", []))
+    prev_selected_options = [opt for opt, idx in row_option_to_orig.items() if idx in prev_selected_orig]
+
+    col_multi, col_btns = st.columns([3, 1])
+    with col_multi:
+        chosen_options = st.multiselect(
+            "Select traces to evaluate",
+            options=row_options,
+            default=prev_selected_options,
+            key="trace_multiselect",
+            placeholder="Click to pick traces, or use Select All →",
+        )
+    with col_btns:
+        st.write("")  # vertical align
+        st.write("")
+        if st.button("Select All", key="trace_sel_all", width="stretch"):
+            st.session_state.trace_selected_indices = all_display_indices
+            st.rerun()
+        if st.button("Clear", key="trace_clear_sel", width="stretch"):
+            st.session_state.trace_selected_indices = []
+            st.rerun()
+
+    selected_indices = [row_option_to_orig[opt] for opt in chosen_options]
     st.session_state.trace_selected_indices = selected_indices
-    st.caption(
-        f"{len(selected_indices)} row(s) selected  |  showing up to 30 of {len(filtered)} traces for this prompt"
-    )
+    st.caption(f"{len(selected_indices)} selected  |  showing up to 30 of {len(filtered)} traces")
 
-    col_sel_all, col_clear_sel = st.columns([1, 1])
-    if col_sel_all.button("Select All Shown", key="trace_sel_all"):
-        st.session_state.trace_selected_indices = [int(row["_orig_idx"]) for _, row in df.iterrows()]
-        st.rerun()
-    if col_clear_sel.button("Clear Selection", key="trace_clear_sel"):
-        st.session_state.trace_selected_indices = []
-        st.rerun()
+    # Details for selected traces
+    if selected_indices:
+        with st.expander(f"Selected trace details ({len(selected_indices)})", expanded=False):
+            for orig_idx in selected_indices:
+                ti = trace_inputs[orig_idx]
+                st.markdown(f"**Trace #{all_display_indices.index(orig_idx) + 1 if orig_idx in all_display_indices else orig_idx}** — `{ti.span_id or 'no span id'}`")
+                dcol1, dcol2 = st.columns(2)
+                with dcol1:
+                    st.caption("User Input")
+                    st.text(ti.user_message or "(none)")
+                with dcol2:
+                    st.caption("Assistant Response")
+                    st.text(ti.trace_output or "(none)")
+                sys_p = getattr(ti, "system_prompt", "") or ""
+                if sys_p:
+                    st.caption("System Prompt")
+                    st.text(sys_p[:400] + ("…" if len(sys_p) > 400 else ""))
+                st.divider()
 
     # ── Section C: Prompt Configuration ────────────────────────────────────
     st.divider()
@@ -936,7 +1170,6 @@ def render_trace_eval_tab() -> None:
             value=st.session_state.get("trace_enhanced_system_prompt", ""),
             height=260,
             placeholder="Paste the enhanced system prompt here...",
-            key="trace_enh_sys_area",
             label_visibility="collapsed",
         )
 
@@ -960,7 +1193,7 @@ def render_trace_eval_tab() -> None:
     )
     if st.button(
         f"Run Full Pipeline on {len(selected_indices)} selected trace(s)",
-        use_container_width=True,
+        width="stretch",
         key="trace_run_pipeline_btn",
         disabled=not selected_indices,
         type="primary",
@@ -974,11 +1207,18 @@ def render_trace_eval_tab() -> None:
             for i, rec in enumerate(pipeline_recs, 1):
                 st.markdown(f"**{i}.** {rec}")
 
+    # Show original vs enhanced diff after pipeline runs
+    pipeline_original = st.session_state.get("trace_original_system_prompt", "")
+    pipeline_enhanced = st.session_state.get("trace_enhanced_system_prompt", "")
+    if pipeline_enhanced and pipeline_recs:
+        st.write("#### Enhanced Prompt")
+        render_diff(pipeline_original, pipeline_enhanced, key="diff_trace_pipeline")
+
     st.write("#### Manual Judge")
     st.caption("Use the prompts configured above (original + enhanced) to run the LLM judge directly.")
     if st.button(
         f"Run LLM Judge on {len(selected_indices)} selected trace(s)",
-        use_container_width=True,
+        width="stretch",
         key="trace_run_judge_btn",
         disabled=not selected_indices,
     ):
@@ -992,3 +1232,54 @@ def render_trace_eval_tab() -> None:
         _render_llm_judge_results(judge_result)
         with st.expander("Debug: API Response", expanded=False):
             st.json(st.session_state.get("trace_llm_judge_api_debug", {}))
+
+    # ── Section F: DeepEval Metrics ─────────────────────────────────────────
+    has_judge = bool(st.session_state.get("trace_llm_judge_result"))
+
+    st.divider()
+    st.write("### DeepEval Metrics")
+    st.caption("Reference-free metrics (AnswerRelevancy, GEval, PromptAlignment, PII) on every trace output. Requires LLM Judge to have been run above.")
+
+    st.session_state.trace_deepeval_metrics_geval_criteria = st.text_input(
+        "GEval Criteria",
+        value=st.session_state.get("trace_deepeval_metrics_geval_criteria", ""),
+        key="trace_deepeval_geval_criteria",
+        help="Custom quality criteria for GEval. Leave blank to skip GEval.",
+    )
+    st.session_state.trace_deepeval_metrics_prompt_instructions = st.text_area(
+        "Prompt Instructions for Alignment Check (one per line)",
+        value=st.session_state.get("trace_deepeval_metrics_prompt_instructions", ""),
+        height=80,
+        key="trace_deepeval_prompt_instructions",
+        placeholder="e.g.\nAlways respond in JSON.\nDo not use bullet points.\nLeave blank to skip PromptAlignment.",
+        help="Instructions to check output alignment against. Leave blank to skip.",
+    )
+
+    if not has_judge:
+        st.info("Run LLM Judge on traces first to enable DeepEval metrics.")
+    if st.button("Run DeepEval Metrics", width="stretch", key="trace_deepeval_run_btn",
+                 disabled=not has_judge, type="primary"):
+        st.session_state.trace_deepeval_metrics_result = None
+        run_deepeval_prompt_metrics()
+
+    trace_metrics_result = st.session_state.get("trace_deepeval_metrics_result")
+    if trace_metrics_result:
+        _render_deepeval_prompt_metrics(trace_metrics_result)
+
+    # ── Section G: LLM Suggestions ──────────────────────────────────────────
+    st.divider()
+    st.write("### LLM Suggestions")
+    st.caption(
+        "One LLM call analyses all trace metrics, score deltas, and key differences "
+        "to produce holistic, priority-ranked suggestions for improving the enhanced prompt."
+    )
+    if not has_judge:
+        st.info("Run LLM Judge on traces first to enable suggestion generation.")
+    if st.button("Generate Suggestions", width="stretch", key="trace_gen_suggestions_btn",
+                 type="primary", disabled=not has_judge):
+        st.session_state.trace_suggestions_result = None
+        generate_overall_suggestions()
+
+    trace_suggestions = st.session_state.get("trace_suggestions_result")
+    if trace_suggestions:
+        _render_overall_suggestions(trace_suggestions)

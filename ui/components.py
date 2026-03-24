@@ -246,7 +246,7 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def render_diff(original: str, enhanced: str) -> None:
+def render_diff(original: str, enhanced: str, key: str = "download_enhanced_prompt_diff") -> None:
     st.write("### Diff: Original vs Enhanced")
 
     if not original and not enhanced:
@@ -299,7 +299,8 @@ def render_diff(original: str, enhanced: str) -> None:
         data=enhanced,
         file_name="enhanced_prompt.txt",
         mime="text/plain",
-        use_container_width=True,
+        width="stretch",
+        key=key,
     )
 
 
@@ -420,7 +421,7 @@ def render_exact_match_results(result: dict) -> None:
             }
             for label, data in classwise.items()
         ]
-        st.dataframe(class_rows, use_container_width=True, hide_index=True)
+        st.dataframe(class_rows, width="stretch", hide_index=True)
 
     if not all_tests:
         return

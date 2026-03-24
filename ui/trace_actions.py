@@ -163,7 +163,7 @@ def run_trace_pipeline() -> None:
     # Use the model configured in the sidebar — not the trace's model
     trace_model = (st.session_state.get("model_name") or "").strip() or None
 
-    reasoning = st.session_state.get("reasoning_effort", "none")
+    reasoning = st.session_state.get("reasoning_effort", "low")
     common = {
         "sessionId": st.session_state.get("session_id", "123"),
         "systemPrompt": original_sys,
@@ -317,7 +317,7 @@ def run_llm_judge_on_traces() -> None:
         for i, ti in enumerate(selected_inputs)
     ]
 
-    reasoning = st.session_state.get("reasoning_effort", "none")
+    reasoning = st.session_state.get("reasoning_effort", "low")
     payload = {
         "sessionId": st.session_state.get("session_id", "123"),
         "type": "llm_judge",
@@ -335,7 +335,7 @@ def run_llm_judge_on_traces() -> None:
 
     with st.spinner(f"Running LLM judge on {len(test_cases)} trace input(s)..."):
         try:
-            data = post_chat(payload)
+            data = post_chat(payload, include_grid_header=False)
             result = extract_test_evaluation_result(data)
             st.session_state.trace_llm_judge_result = result
             st.session_state.trace_llm_judge_api_debug = data
@@ -389,7 +389,7 @@ def run_trace_evaluation() -> None:
     if enhanced_user_tpl:
         enhanced_fields["userPromptTemplate"] = enhanced_user_tpl
 
-    reasoning = st.session_state.get("reasoning_effort", "none")
+    reasoning = st.session_state.get("reasoning_effort", "low")
     base_payload = {
         "sessionId": st.session_state.get("session_id", "123"),
         "modelName": (st.session_state.get("model_name") or "").strip() or None,

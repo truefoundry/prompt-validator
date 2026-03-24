@@ -67,8 +67,15 @@ def init_session_state() -> None:
         # Behavioral recommendations (F1)
         "rec_trace_examples": None,
         "behavioral_recommendations": [],
-        # LLM judge override (F7)
-        "judge_prompt_override": "",
+        # Arena Evaluation (Enhance tab)
+        "arena_eval_result": None,
+        "arena_eval_criteria": "Choose the response that is more accurate, complete, and professional.",
+        # Trace eval — suggestions + DeepEval metrics
+        "trace_suggestions_result": None,
+        "trace_suggestions_selected": [],
+        "trace_deepeval_metrics_result": None,
+        "trace_deepeval_metrics_geval_criteria": "Assess the overall quality, relevance, and completeness of the response given the user input.",
+        "trace_deepeval_metrics_prompt_instructions": "",
     }
     for key, value in defaults.items():
         if key not in st.session_state:

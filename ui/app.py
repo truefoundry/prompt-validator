@@ -17,6 +17,7 @@ from ui.tabs import (
     render_trace_eval_tab,
 )
 
+
 def main() -> None:
     st.set_page_config(page_title="Prompt Tuner UI", layout="wide")
     init_session_state()

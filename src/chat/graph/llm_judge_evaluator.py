@@ -9,9 +9,7 @@ from src.common.service.logging.logger import info
 
 _JUDGE_SYSTEM_PROMPT = """You are an expert prompt engineer and evaluator. You are given a user input, and two AI responses — Response A from the original system prompt and Response B from an enhanced system prompt.
 
-Your job has two parts:
-1. Score both responses on quality metrics.
-2. Generate concrete, actionable recommendations to improve the ORIGINAL system prompt — based on what you observe is missing, wrong, or weak in Response A when compared to the ideal answer for the given user input.
+Your job: score both responses on quality metrics and identify the key observable differences between them.
 
 ### Scoring Rubric (0.0 to 1.0 scale)
 - 0.0: Fails to meet any requirements or is completely irrelevant.
@@ -32,15 +30,6 @@ Score each response on these metrics:
 
 ### Key Differences
 Identify the most notable observable differences between Response A and Response B in terms of style, structure, content coverage, or phrasing. These are factual comparisons, not judgements.
-
-### Prompt Improvement Recommendations
-Analyze the user input alongside both outputs. For each weakness you identify in Response A (things that were missing, incorrect, poorly phrased, or that Response B handled better), write a specific instruction that could be added to the original system prompt to fix it.
-
-Rules for recommendations:
-- Each recommendation must be a directive the system prompt can follow, e.g. "Always include...", "When the input contains X, respond with Y", "Do not use abbreviations — use full names".
-- Ground each recommendation in specific evidence from the user input and outputs — do NOT write generic advice.
-- Focus on Response A's gaps relative to what the user input required, not just differences from Response B.
-- Write 2–5 recommendations. More is not better — only include high-impact changes.
 
 ### Output Constraints
 Return ONLY valid JSON. Do NOT include markdown code fences (e.g., ```json), conversational filler, or any text before or after the JSON object.
@@ -68,10 +57,6 @@ Format:
   "key_differences": [
     "Response A uses full month names while Response B uses abbreviations.",
     "Response B includes all subsidiary facets in the summary; Response A omits them."
-  ],
-  "prompt_recommendations": [
-    "Always list all facet types (department, location, subsidiary) in the variance summary, even if only one has a non-zero value.",
-    "Use full month and year references (e.g. 'February 2026') rather than abbreviated formats."
   ]
 }"""
 
@@ -99,29 +84,35 @@ class LLMJudgeEvaluator(PromptEvaluator):
         enhanced_system_prompt: str,
         user_prompt_template: str | None,
     ) -> list[dict]:
-        """Get LLM responses for both prompts in parallel for each test case."""
+        """Get LLM responses for both prompts in parallel for each test case.
+
+        Uses a semaphore to cap concurrent LLM calls and avoid rate-limit retries
+        that make large test sets slower than controlled parallelism.
+        """
+        sem = asyncio.Semaphore(5)
 
         async def get_pair(test: dict) -> dict:
-            orig, enh = await asyncio.gather(
-                PromptService.get_prompt_response_from_text(
-                    system_prompt=original_system_prompt,
-                    user_prompt_template=user_prompt_template,
-                    data=test["data"],
-                    model_name=self.model_name,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                    reasoning_effort=self.reasoning_effort,
-                ),
-                PromptService.get_prompt_response_from_text(
-                    system_prompt=enhanced_system_prompt,
-                    user_prompt_template=user_prompt_template,
-                    data=test["data"],
-                    model_name=self.model_name,
-                    max_tokens=self.max_tokens,
-                    temperature=self.temperature,
-                    reasoning_effort=self.reasoning_effort,
-                ),
-            )
+            async with sem:
+                orig, enh = await asyncio.gather(
+                    PromptService.get_prompt_response_from_text(
+                        system_prompt=original_system_prompt,
+                        user_prompt_template=user_prompt_template,
+                        data=test["data"],
+                        model_name=self.model_name,
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                        reasoning_effort=self.reasoning_effort,
+                    ),
+                    PromptService.get_prompt_response_from_text(
+                        system_prompt=enhanced_system_prompt,
+                        user_prompt_template=user_prompt_template,
+                        data=test["data"],
+                        model_name=self.model_name,
+                        max_tokens=self.max_tokens,
+                        temperature=self.temperature,
+                        reasoning_effort=self.reasoning_effort,
+                    ),
+                )
             test["original_output"] = orig
             test["enhanced_output"] = enh
             return test
@@ -145,14 +136,14 @@ class LLMJudgeEvaluator(PromptEvaluator):
             model_name=self.model_name,
             max_tokens=self.max_tokens,
             temperature=0.0,
+            reasoning_effort=self.reasoning_effort,
         )
         try:
             # Strip markdown fences if present
             cleaned = raw.strip()
             if cleaned.startswith("```"):
-                cleaned = cleaned.split("```")[1]
-                if cleaned.startswith("json"):
-                    cleaned = cleaned[4:]
+                cleaned = cleaned.split("\n", 1)[-1]
+                cleaned = cleaned.rsplit("```", 1)[0]
             scores = json.loads(cleaned.strip())
             info(f"[JUDGE_SINGLE] test_id={test.get('test_case_id')} | orig_overall={scores.get('original', {}).get('overall')} | enh_overall={scores.get('enhanced', {}).get('overall')} | improved={scores.get('improved')}")
         except (json.JSONDecodeError, IndexError):
@@ -169,7 +160,13 @@ class LLMJudgeEvaluator(PromptEvaluator):
         }
 
     async def evaluate_tests(self, all_tests: list[dict], is_rag: bool = False, judge_system_prompt_override: str | None = None) -> list[dict]:
-        return list(await asyncio.gather(*[self._judge_single(t, judge_system_prompt_override=judge_system_prompt_override) for t in all_tests]))
+        sem = asyncio.Semaphore(5)
+
+        async def _judge_with_sem(t):
+            async with sem:
+                return await self._judge_single(t, judge_system_prompt_override=judge_system_prompt_override)
+
+        return list(await asyncio.gather(*[_judge_with_sem(t) for t in all_tests]))
 
     def get_final_report(self, all_tests: list[dict], evaluation_results: list[dict]) -> dict:
         metrics = ["clarity", "completeness", "accuracy", "conciseness", "professional_tone", "overall"]

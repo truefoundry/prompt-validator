@@ -176,6 +176,47 @@ class TrueFoundryLLM(DeepEvalBaseLLM):
     def get_model_name(self):
         return f"TrueFoundry {self.model.model_name}"
 
+    def _make_json_model(self):
+        """Return a copy of the model with json_object response format enforced."""
+        base = self.model
+        extra_headers = (base.model_kwargs or {}).get("extra_headers", {})
+        json_kwargs = {
+            "extra_headers": extra_headers,
+            "response_format": {"type": "json_object"},
+        }
+        kwargs: dict[str, Any] = dict(
+            model=base.model_name,
+            temperature=base.temperature,
+            max_tokens=base.max_tokens,
+            streaming=False,
+            openai_api_key=base.openai_api_key,
+            base_url=str(base.openai_api_base),
+            model_kwargs=json_kwargs,
+        )
+        if getattr(base, "reasoning_effort", None):
+            kwargs["reasoning_effort"] = base.reasoning_effort
+        return ChatOpenAI(**kwargs)
+
+    def generate_with_schema(self, prompt, schema=None, **kwargs):
+        """Force json_object mode so the model returns clean JSON without markdown fences or reasoning prefixes."""
+        chat_model = self._make_json_model()
+        if isinstance(prompt, str):
+            from langchain.schema import HumanMessage
+            messages = [HumanMessage(content=prompt)]
+        else:
+            messages = prompt
+        return chat_model.invoke(messages).content
+
+    async def a_generate_with_schema(self, prompt, schema=None, **kwargs):
+        chat_model = self._make_json_model()
+        if isinstance(prompt, str):
+            from langchain.schema import HumanMessage
+            messages = [HumanMessage(content=prompt)]
+        else:
+            messages = prompt
+        res = await chat_model.ainvoke(messages)
+        return res.content
+
 
 class AzureOpenAI(DeepEvalBaseLLM):
     """
