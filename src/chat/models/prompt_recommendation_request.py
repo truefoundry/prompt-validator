@@ -1,5 +1,8 @@
-from pydantic import BaseModel, Field, create_model, model_validator
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional
+
+# Request types that do not require a prompt FQN or system prompt.
+_PROMPT_NOT_REQUIRED_TYPES = {"deepeval_prompt_metrics"}
 
 
 class PromptRecommendationRequest(BaseModel):
@@ -66,9 +69,58 @@ class PromptRecommendationRequest(BaseModel):
         alias="judgeSystemPromptOverride",
         description="Optional override for the LLM judge system prompt.",
     )
+    # ── Fields for generate_suggestions ──────────────────────────────────────
+    judge_result: Optional[dict] = Field(
+        default=None,
+        alias="judgeResult",
+        description="Full LLM-judge result dict used by the generate_suggestions handler.",
+    )
+    # ── Fields for llm_judge ─────────────────────────────────────────────────
+    judge_metrics: Optional[List[str]] = Field(
+        default=None,
+        alias="judgeMetrics",
+        description="List of metric keys to evaluate. Defaults to the 5 general metrics.",
+    )
+    enhanced_model_name: Optional[str] = Field(
+        default=None,
+        alias="enhancedModelName",
+        description="Model to use for the enhanced prompt responses (falls back to modelName if not set).",
+    )
+    enhanced_temperature: Optional[float] = Field(
+        default=None,
+        alias="enhancedTemperature",
+        description="Temperature for enhanced prompt model (falls back to temperature if not set).",
+    )
+    enhanced_max_tokens: Optional[int] = Field(
+        default=None,
+        alias="enhancedMaxTokens",
+        description="Max tokens for enhanced prompt model (falls back to maxTokens if not set).",
+    )
+    enhanced_reasoning_effort: Optional[str] = Field(
+        default=None,
+        alias="enhancedReasoningEffort",
+        description="Reasoning effort for enhanced prompt model (falls back to reasoningEffort if not set).",
+    )
+    # ── Fields for arena_comparison ───────────────────────────────────────────
+    arena_criteria: Optional[str] = Field(
+        default=None,
+        alias="arenaCriteria",
+        description="Natural-language criteria describing what makes one response better than another.",
+    )
+    # ── Fields for deepeval_prompt_metrics ───────────────────────────────────
+    geval_criteria: Optional[str] = Field(
+        default=None,
+        alias="gevalCriteria",
+        description="Custom quality criteria for GEval. Leave blank to skip GEval.",
+    )
+    prompt_instructions: Optional[List[str]] = Field(
+        default=None,
+        alias="promptInstructions",
+        description="Instruction strings for PromptAlignmentMetric. Leave empty to skip.",
+    )
 
     @model_validator(mode="after")
     def require_fqn_or_raw_text(self):
-        if not self.prompt_fqn and not self.system_prompt:
+        if self.type not in _PROMPT_NOT_REQUIRED_TYPES and not self.prompt_fqn and not self.system_prompt:
             raise ValueError("Either promptFQN or systemPrompt must be provided.")
         return self

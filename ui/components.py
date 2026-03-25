@@ -3,6 +3,27 @@ import re
 
 import streamlit as st
 
+
+def render_section_header(
+    icon: str,
+    title: str,
+    description: str = "",
+    step: int | None = None,
+) -> None:
+    """Render a styled section header with optional step number and description."""
+    step_html = ""
+    if step is not None:
+        step_html = f'<span class="pt-step">{step}</span>'
+    desc_html = f'<p class="pt-desc">{description}</p>' if description else ""
+    st.markdown(
+        f"""<div class="pt-section-header">
+  {step_html}
+  <span class="pt-icon">{icon}</span>
+  <div><p class="pt-title">{title}</p>{desc_html}</div>
+</div>""",
+        unsafe_allow_html=True,
+    )
+
 _PROMPT_CONTAINER_CSS = """\
 <style>
 .prompt-box {
@@ -45,7 +66,15 @@ _PROMPT_CONTAINER_CSS = """\
 .prompt-box .xml-attr-value { color: #ce9178; }
 .prompt-box .tpl-var { color: #dcdcaa; font-weight: 600; }
 .prompt-box .md-heading { color: #569cd6; font-weight: 700; }
-.prompt-box .md-bold { color: #e0e0e0; font-weight: 700; }
+.prompt-box strong.md-bold { color: #e0e0e0; font-weight: 700; }
+.prompt-box em.md-italic { color: #c9d1d9; font-style: italic; }
+.prompt-box code.md-code {
+    background: rgba(110,118,129,0.2);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 12px;
+    color: #79c0ff;
+}
 .prompt-box .md-bullet { color: #6a9955; font-weight: 700; }
 .prompt-box .comment-line { color: #6a9955; font-style: italic; }
 .prompt-box .empty-line { min-height: 20px; }
@@ -85,16 +114,20 @@ _ATTR_RE = re.compile(
     r'([\w:.-]+)(\s*=\s*)((?:&quot;[^&]*?&quot;|&apos;[^&]*?&apos;|[^\s&]+))'
 )
 _TPL_VAR_RE = re.compile(r'(\{\{[\w.\-\s|]+?\}\}|\{[\w.\-]+?\})')
-_MD_HEADING_RE = re.compile(r'^(#{1,6}\s+.*)$', re.MULTILINE)
-_MD_BOLD_RE = re.compile(r'(\*\*[^*]+?\*\*|__[^_]+?__)')
+_MD_BOLD_RE = re.compile(r'\*\*([^*]+?)\*\*|__([^_]+?)__')
+_MD_ITALIC_RE = re.compile(r'(?<!\*)\*([^*]+?)\*(?!\*)|(?<!_)_([^_]+?)_(?!_)')
+_MD_CODE_RE = re.compile(r'`([^`]+?)`')
 _MD_BULLET_RE = re.compile(r'^(\s*(?:[-*]|\d+\.)\s)')
 
 
 def _highlight(text: str) -> str:
-    """Apply syntax highlighting to an already-HTML-escaped line of prompt text."""
+    """Apply syntax highlighting + markdown rendering to an HTML-escaped prompt line."""
     text = _TAG_RE.sub(_highlight_tag, text)
     text = _TPL_VAR_RE.sub(r'<span class="tpl-var">\1</span>', text)
-    text = _MD_BOLD_RE.sub(r'<span class="md-bold">\1</span>', text)
+    # Render markdown as actual HTML formatting
+    text = _MD_BOLD_RE.sub(lambda m: f'<strong class="md-bold">{m.group(1) or m.group(2)}</strong>', text)
+    text = _MD_ITALIC_RE.sub(lambda m: f'<em class="md-italic">{m.group(1) or m.group(2)}</em>', text)
+    text = _MD_CODE_RE.sub(r'<code class="md-code">\1</code>', text)
     m_bullet = _MD_BULLET_RE.match(text)
     if m_bullet:
         text = f'<span class="md-bullet">{m_bullet.group(1)}</span>{text[m_bullet.end():]}'
@@ -118,7 +151,7 @@ def _highlight_tag(m: re.Match) -> str:
     )
 
 
-def render_prompt_html(prompt_text: str, *, label: str = "Prompt", max_height: int = 480) -> None:
+def render_prompt_html(prompt_text: str, *, label: str = "Prompt", max_height: int = 480, key: str | None = None) -> None:
     """Render a prompt string as a syntax-highlighted, read-only HTML block."""
     if not prompt_text:
         st.info(f"No {label.lower()} available yet.")
@@ -168,16 +201,41 @@ def render_recommendation_checkboxes() -> None:
         st.info("No recommendations to display. Fetch recommendations first.")
         return
 
-    st.write("### Select Recommendations to Apply")
+    render_section_header("💡", "Select Recommendations to Apply",
+                          f"{len(recommendations)} suggestion(s) found — check the ones you want to apply")
     selected_values: list[str] = []
     for index, recommendation in enumerate(recommendations):
         key = f"rec_checkbox_{index}_{abs(hash(recommendation))}"
         previous_selected = recommendation in st.session_state.selected_recommendations
-        checked = st.checkbox(recommendation, value=previous_selected, key=key)
+        col_cb, col_text = st.columns([0.05, 0.95])
+        with col_cb:
+            checked = st.checkbox("", value=previous_selected, key=key, label_visibility="collapsed")
+        with col_text:
+            bg = "#f5f3ff" if previous_selected else "#fafafa"
+            border = "#c4b5fd" if previous_selected else "#e2e8f0"
+            num_color = "#6366f1"
+            st.markdown(
+                f"""<div style="background:{bg};border:1.5px solid {border};border-radius:8px;
+padding:10px 14px;margin-bottom:4px;display:flex;align-items:flex-start;gap:10px;
+cursor:pointer;transition:all 0.15s;">
+  <span style="background:#6366f115;color:{num_color};font-size:0.72rem;font-weight:700;
+               padding:2px 7px;border-radius:20px;flex-shrink:0;margin-top:1px;">
+    #{index + 1}
+  </span>
+  <span style="font-size:0.875rem;color:#334155;line-height:1.5;">{recommendation}</span>
+</div>""",
+                unsafe_allow_html=True,
+            )
         if checked:
             selected_values.append(recommendation)
 
     st.session_state.selected_recommendations = selected_values
+    if selected_values:
+        st.markdown(
+            f'<p style="font-size:0.8rem;color:#6366f1;font-weight:600;margin:6px 0 0 0;">'
+            f'✓ {len(selected_values)} recommendation(s) selected</p>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_selected_recommendations_editor() -> list[str]:
@@ -190,7 +248,14 @@ def render_selected_recommendations_editor() -> list[str]:
         st.session_state.editable_recommendations = list(selected)
         st.session_state.last_selected_signature = selected_signature
 
-    st.write("### Selected Recommendations (Editable)")
+    count = len(st.session_state.editable_recommendations)
+    st.markdown(
+        f'<p style="font-size:0.82rem;font-weight:600;color:#334155;margin:0 0 6px 0;">'
+        f'Selected Recommendations'
+        f'{"" if not count else f" <span style=\'background:#6366f115;color:#6366f1;padding:1px 8px;border-radius:20px;font-size:0.72rem;font-weight:700;\'>{count}</span>"}'
+        f'</p>',
+        unsafe_allow_html=True,
+    )
     editable_text = st.text_area(
         "Edit selected recommendations (one per line)",
         value="\n".join(st.session_state.editable_recommendations),
@@ -204,28 +269,47 @@ def render_selected_recommendations_editor() -> list[str]:
 
 
 def render_scores(title: str, empty_info_text: str) -> None:
-    st.write(title)
-    if isinstance(st.session_state.total_score, int):
-        st.metric("Total Score", st.session_state.total_score)
+    render_section_header("📊", title.lstrip("#").strip())
 
     criteria_scores = st.session_state.criteria_scores
     explanations = st.session_state.explanations
+
+    if isinstance(st.session_state.total_score, int):
+        total = st.session_state.total_score
+        color = "#10b981" if total >= 70 else "#f59e0b" if total >= 40 else "#ef4444"
+        label_text = "Excellent" if total >= 70 else "Needs Work" if total >= 40 else "Needs Improvement"
+        st.markdown(
+            f"""<div style="background:linear-gradient(135deg,{color}18,{color}28);
+border:1px solid {color}50;border-radius:14px;padding:16px 22px;
+display:flex;align-items:center;gap:20px;margin:12px 0 16px 0;">
+  <div style="font-size:2.4rem;font-weight:800;color:{color};line-height:1;">{total}</div>
+  <div>
+    <p style="margin:0;font-size:0.82rem;font-weight:700;text-transform:uppercase;
+              letter-spacing:0.06em;color:{color};">Total Score</p>
+    <p style="margin:4px 0 0 0;font-size:0.78rem;color:#64748b;">{label_text}</p>
+  </div>
+  <div style="margin-left:auto;background:{color}20;border-radius:8px;
+              padding:6px 14px;border:1px solid {color}40;">
+    <span style="font-size:0.8rem;font-weight:600;color:{color};">{total}/100</span>
+  </div>
+</div>""",
+            unsafe_allow_html=True,
+        )
 
     if not criteria_scores:
         st.info(empty_info_text)
         return
 
-    for criterion, score in criteria_scores.items():
+    cols = st.columns(min(len(criteria_scores), 4))
+    for i, (criterion, score) in enumerate(criteria_scores.items()):
         label = str(criterion).replace("_", " ").title()
         explanation = (
             explanations.get(criterion, "")
             if isinstance(explanations, dict)
             else ""
         )
-        col_score, col_explanation = st.columns([1, 4])
-        with col_score:
+        with cols[i % len(cols)]:
             st.metric(label, score)
-        with col_explanation:
             if explanation:
                 st.caption(explanation)
 
@@ -246,8 +330,64 @@ def _escape(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+@st.cache_data(show_spinner=False)
+def _build_diff_html(original: str, enhanced: str) -> str:
+    """Build the diff HTML string for two prompt texts.
+
+    Pure function — cached by Streamlit so the difflib computation and HTML
+    construction only run when *original* or *enhanced* actually changes.
+    """
+    original_lines = original.splitlines() if original else []
+    enhanced_lines = enhanced.splitlines()
+
+    diff = list(difflib.ndiff(original_lines, enhanced_lines))
+
+    removed = sum(1 for l in diff if l.startswith("- "))
+    added = sum(1 for l in diff if l.startswith("+ "))
+
+    html_parts = [
+        f'<div style="margin-bottom:8px;display:flex;gap:10px;align-items:center;">'
+        f'<span style="background:rgba(248,81,73,0.15);color:#ff7b72;padding:3px 10px;border-radius:20px;'
+        f'font-size:0.75rem;font-weight:600;border:1px solid rgba(248,81,73,0.4);">−{removed} removed</span>'
+        f'<span style="background:rgba(63,185,80,0.15);color:#3fb950;padding:3px 10px;border-radius:20px;'
+        f'font-size:0.75rem;font-weight:600;border:1px solid rgba(63,185,80,0.4);">+{added} added</span>'
+        f'</div>',
+        '<div style="border:1px solid #30363d; border-radius:10px; overflow:hidden; '
+        'overflow-y:auto; max-height:520px; font-family:\'SFMono-Regular\',Consolas,monospace; '
+        'font-size:0.82rem; line-height:1.7; background:#0d1117;">',
+    ]
+
+    for line in diff:
+        if line.startswith("- "):
+            content = _escape(line[2:])
+            html_parts.append(
+                f'<div style="background:rgba(248,81,73,0.1);color:#ff7b72;padding:3px 14px;'
+                f'border-left:3px solid #f85149;margin:0;white-space:pre-wrap;word-break:break-all;">'
+                f'<span style="font-weight:700;margin-right:8px;">−</span>{content}</div>'
+            )
+        elif line.startswith("+ "):
+            content = _escape(line[2:])
+            html_parts.append(
+                f'<div style="background:rgba(46,160,67,0.1);color:#3fb950;padding:3px 14px;'
+                f'border-left:3px solid #238636;margin:0;white-space:pre-wrap;word-break:break-all;">'
+                f'<span style="font-weight:700;margin-right:8px;">+</span>{content}</div>'
+            )
+        elif line.startswith("? "):
+            continue
+        else:
+            content = _escape(line[2:])
+            html_parts.append(
+                f'<div style="padding:3px 14px;color:#8b949e;margin:0;'
+                f'white-space:pre-wrap;word-break:break-all;border-left:3px solid transparent;">'
+                f'<span style="margin-right:8px;visibility:hidden;">+</span>{content}</div>'
+            )
+
+    html_parts.append("</div>")
+    return "".join(html_parts)
+
+
 def render_diff(original: str, enhanced: str, key: str = "download_enhanced_prompt_diff") -> None:
-    st.write("### Diff: Original vs Enhanced")
+    render_section_header("🔀", "Diff: Original vs Enhanced", "Lines removed from original (red) and added in enhanced (green)")
 
     if not original and not enhanced:
         st.info("Apply recommendations to see the diff here.")
@@ -257,42 +397,7 @@ def render_diff(original: str, enhanced: str, key: str = "download_enhanced_prom
         st.info("Enhanced prompt not available yet.")
         return
 
-    original_lines = original.splitlines() if original else []
-    enhanced_lines = enhanced.splitlines()
-
-    diff = list(difflib.ndiff(original_lines, enhanced_lines))
-
-    html_parts = [
-        '<div style="border:1px solid #d0d0d0; border-radius:6px; '
-        'overflow-y:auto; max-height:520px; font-family:monospace; font-size:13px;">'
-    ]
-
-    for line in diff:
-        if line.startswith("- "):
-            content = _escape(line[2:])
-            html_parts.append(
-                f'<div style="background:#ffeef0; color:#b31d28; '
-                f'padding:4px 12px; border-left:4px solid #e74c3c; margin:0;">'
-                f'<span style="font-weight:bold; margin-right:6px;">-</span>{content}</div>'
-            )
-        elif line.startswith("+ "):
-            content = _escape(line[2:])
-            html_parts.append(
-                f'<div style="background:#e6ffed; color:#22863a; '
-                f'padding:4px 12px; border-left:4px solid #2ecc71; margin:0;">'
-                f'<span style="font-weight:bold; margin-right:6px;">+</span>{content}</div>'
-            )
-        elif line.startswith("? "):
-            continue
-        else:
-            content = _escape(line[2:])
-            html_parts.append(
-                f'<div style="padding:4px 12px; color:inherit; margin:0;">'
-                f'<span style="margin-right:6px; visibility:hidden;">+</span>{content}</div>'
-            )
-
-    html_parts.append("</div>")
-    st.markdown("".join(html_parts), unsafe_allow_html=True)
+    st.markdown(_build_diff_html(original, enhanced), unsafe_allow_html=True)
 
     st.download_button(
         label="Save Enhanced Prompt",
@@ -312,9 +417,23 @@ def render_deepeval_results(result: dict) -> None:
     num_tests = all_metrics.get("Number of Tests", len(all_tests))
     num_errors = all_metrics.get("Number of Tests with Errors", 0)
     num_passed = sum(1 for t in all_tests if t.get("pass_status"))
-    pass_rate = f"{num_passed / num_tests * 100:.1f}%" if num_tests else "—"
+    pass_rate_val = num_passed / num_tests * 100 if num_tests else 0
+    pass_rate = f"{pass_rate_val:.1f}%"
 
-    st.write("#### Summary")
+    render_section_header("📋", "Test Results Summary")
+    rate_color = "#10b981" if pass_rate_val >= 80 else "#f59e0b" if pass_rate_val >= 50 else "#ef4444"
+    st.markdown(
+        f"""<div style="background:linear-gradient(135deg,{rate_color}12,{rate_color}20);
+border:1px solid {rate_color}40;border-radius:12px;padding:14px 20px;margin:0 0 16px 0;
+display:flex;align-items:center;gap:8px;">
+  <span style="font-size:1.5rem;font-weight:800;color:{rate_color};">{pass_rate}</span>
+  <span style="font-size:0.82rem;color:#64748b;">pass rate &nbsp;·&nbsp;
+  <strong style="color:#1e293b;">{num_passed}</strong> of <strong style="color:#1e293b;">{num_tests}</strong> tests passed
+  {f'&nbsp;·&nbsp; <strong style="color:#ef4444;">{num_errors} error(s)</strong>' if num_errors else ''}
+  </span>
+</div>""",
+        unsafe_allow_html=True,
+    )
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Total Tests", num_tests)
     c2.metric("Passed", num_passed)
@@ -336,20 +455,24 @@ def render_deepeval_results(result: dict) -> None:
         tid = t.get("test_case_id", "")
         passed = t.get("pass_status")
         icon = "✅" if passed else "❌"
+        latency = t.get("latency_s")
+        latency_str = f" · ⏱ {latency}s" if latency is not None else ""
         input_text = (
             t.get("input")
             or t.get("data", {}).get("input", "")
             or t.get("test_case_name", "")
         )
         label = (
-            f"{icon}  Test {tid} — {str(input_text)[:80]}{'…' if len(str(input_text)) > 80 else ''}"
+            f"{icon}  Test {tid} — {str(input_text)[:80]}{'…' if len(str(input_text)) > 80 else ''}{latency_str}"
             if input_text
-            else f"{icon}  Test {tid}"
+            else f"{icon}  Test {tid}{latency_str}"
         )
         with st.expander(label, expanded=False):
-            c1, c2 = st.columns(2)
+            c1, c2, c3 = st.columns(3)
             c1.markdown(f"**Test Case ID:** `{tid}`")
             c2.markdown(f"**Status:** {'✅ Passed' if passed else '❌ Failed'}")
+            if latency is not None:
+                c3.markdown(f"**Latency:** `{latency}s`")
 
             name = t.get("test_case_name", "")
             if name:
@@ -432,15 +555,19 @@ def render_exact_match_results(result: dict) -> None:
         tid = t.get("test_case_id", "")
         passed = t.get("pass_status")
         icon = "✅" if passed else "❌"
+        latency = t.get("latency_s")
+        latency_str = f" · ⏱ {latency}s" if latency is not None else ""
         input_text = (
             t.get("input")
             or t.get("data", {}).get("input", "")
         )
-        label = f"{icon}  Test {tid} — {str(input_text)[:80]}{'…' if len(str(input_text)) > 80 else ''}"
+        label = f"{icon}  Test {tid} — {str(input_text)[:80]}{'…' if len(str(input_text)) > 80 else ''}{latency_str}"
         with st.expander(label, expanded=False):
-            c1, c2 = st.columns(2)
+            c1, c2, c3 = st.columns(3)
             c1.markdown(f"**Test Case ID:** `{tid}`")
             c2.markdown(f"**Status:** {'✅ Passed' if passed else '❌ Failed'}")
+            if latency is not None:
+                c3.markdown(f"**Latency:** `{latency}s`")
 
             name = t.get("test_case_name", "")
             if name:

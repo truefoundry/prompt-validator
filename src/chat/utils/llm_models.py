@@ -16,6 +16,35 @@ from src.common.service.logging.logger import error, info
 CONFIG = get_application_config()
 
 
+def _supports_json_schema(model_name: str) -> bool:
+    """Returns True if the model supports OpenAI structured output (beta.chat.completions.parse).
+    Gemini and other non-native OpenAI models routed through TFY do NOT support this endpoint.
+    """
+    m = model_name.lower()
+    # Only native OpenAI and Azure OpenAI models support json_schema structured output
+    native_openai = m.startswith("openai-main/") or m.startswith("openai/") or m.startswith("azure/")
+    return native_openai
+
+
+def _supports_reasoning_effort(model_name: str) -> bool:
+    """Returns True if the model supports the reasoning_effort parameter."""
+    m = model_name.lower()
+    return any([
+        # OpenAI reasoning models
+        "o4-mini" in m, "o4-preview" in m, "o3-pro" in m, "o3-mini" in m, "/o3" in m,
+        "/o1" in m, "o1-mini" in m, "o1-preview" in m,
+        "gpt-5" in m, "codex-mini" in m,
+        # Anthropic
+        "claude-opus-4" in m, "claude-sonnet-4" in m, "claude-3-7" in m, "claude-sonnet-3.7" in m,
+        # Gemini — 2.5 and 3 series support reasoning_effort (confirmed via CLI test)
+        "gemini-2.5" in m, "gemini-3" in m,
+        # Groq reasoning models
+        "deepseek-r1" in m, "qwen3" in m, "qwen-3" in m, "gpt-oss" in m,
+        # xAI
+        "grok-3-mini" in m,
+    ])
+
+
 def _resolve_model_name(model_name: str | None = None) -> str:
     if model_name and model_name.strip():
         return model_name.strip()
@@ -97,25 +126,43 @@ def get_truefoundry_llm(
         },
     }
     if response_schema:
-        model_kwargs["response_format"] = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "structured-output",
-                "schema": response_schema,
-            },
-        }
+        if _supports_json_schema(selected_model_name):
+            model_kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "structured-output",
+                    "schema": response_schema,
+                },
+            }
+            info(f"[LLM] Using json_schema structured output for model={selected_model_name}")
+        else:
+            # For Gemini and other non-native-OpenAI models, ANY response_format in model_kwargs
+            # causes langchain_openai>=0.3 to route through beta.chat.completions.parse which
+            # these models don't support. Skip response_format entirely — the prompt instructs
+            # the model to return JSON and we parse the plain text response downstream.
+            info(f"[LLM] Skipping response_format (unsupported via TFY) for model={selected_model_name}")
+    resolved_temperature = temperature if temperature is not None else 0.1
+    # Anthropic requires temperature=1 when extended thinking (reasoning_effort) is enabled
+    if reasoning_effort and reasoning_effort != "none" and "claude" in selected_model_name.lower():
+        resolved_temperature = 1.0
+
     kwargs: dict[str, Any] = {
         "model": selected_model_name,
-        "temperature": temperature if temperature is not None else 0.1,
+        "temperature": resolved_temperature,
         "max_tokens": max_tokens or 15000,
         "streaming": False,
         "openai_api_key": os.getenv("TFY_API_KEY"),
         "base_url": os.getenv("LLM_BASE_URL"),
         "model_kwargs": model_kwargs,
     }
-    if reasoning_effort:
-        kwargs["reasoning_effort"] = reasoning_effort
+    if reasoning_effort and reasoning_effort != "none":
+        if _supports_reasoning_effort(selected_model_name):
+            kwargs["reasoning_effort"] = reasoning_effort
+            info(f"[LLM] reasoning_effort={reasoning_effort} applied for model={selected_model_name}")
+        else:
+            info(f"[LLM] reasoning_effort={reasoning_effort} SKIPPED (not supported) for model={selected_model_name}")
 
+    info(f"[LLM] ChatOpenAI kwargs: model={selected_model_name} | temperature={kwargs.get('temperature')} | max_tokens={kwargs.get('max_tokens')} | reasoning_effort={kwargs.get('reasoning_effort', 'none')}")
     return ChatOpenAI(**kwargs)
 
 
@@ -193,8 +240,9 @@ class TrueFoundryLLM(DeepEvalBaseLLM):
             base_url=str(base.openai_api_base),
             model_kwargs=json_kwargs,
         )
-        if getattr(base, "reasoning_effort", None):
-            kwargs["reasoning_effort"] = base.reasoning_effort
+        re = getattr(base, "reasoning_effort", None)
+        if re and re != "none" and _supports_reasoning_effort(base.model_name):
+            kwargs["reasoning_effort"] = re
         return ChatOpenAI(**kwargs)
 
     def generate_with_schema(self, prompt, schema=None, **kwargs):

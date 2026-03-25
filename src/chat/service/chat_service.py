@@ -1,4 +1,5 @@
 import asyncio
+import time
 import traceback
 import json
 import re
@@ -49,7 +50,7 @@ def _parse_with_sanitizer(raw_text: str, model_cls: Type[BaseModel]) -> BaseMode
             return None
 
 
-async def _get_last_ai_message(events):
+def _get_last_ai_message(events):
     """
     Retrieve the last AI message from a list of events, ensuring the message
     does not include any tool calls.
@@ -106,35 +107,7 @@ class ChatService:
             # print the graph
             # signal(graph.get_graph().draw_mermaid())
 
-            """
-            Conversation can be classified into types: Interrupted and New
-            Interrupted conversation:
-            An interrupted conversation is when the user is asked a question and the user responds with a yes or no.
-            Example: User is asked if they would like to refill a metformin prescription and they respond with a yes or no.
-            Request will always comprise of a context. This context will be used to determine the next action.
-
-            New conversation:
-            A new conversation is when the user initiates a conversation with the chatbot.
-            Example: User asks the chatbot to refill a prescription.
-            Request will not have a context.
-            """
             events = await _resume_a_new_conversation(request, configuration, graph)
-
-            """
-            Streaming the graph with the user input and configuration generates a list of conversational events.
-            Events are a list of dictionaries containing messages, tool calls, and other information.
-            AI message in the last event is the response to the user.
-            Example:
-            events = [
-            {
-                "messages": [
-                HumanMessage(content="refill my prescriptions.", id='...'),
-                AIMessage(content="Let me find prescriptions for refills",  tools=["ToRefill"] id='...')
-                ToolMessage(content="Searching for prescriptions to refill", tool_call_id='...'),
-                AIMessage(content="You can refill metformin 40 mg", id='...'),
-                ],
-            }
-            """
             chat_response = await _process_events_and_build_response(
                 request, events, graph, configuration
             )
@@ -142,7 +115,7 @@ class ChatService:
             return chat_response
 
         except Exception as e:
-            error(f"Error: {e}")
+            error(f"[ChatService] get_chat_response failed | {type(e).__name__}: {e}\n{traceback.format_exc()}")
             raise e
 
 
@@ -198,22 +171,14 @@ async def _process_events_and_build_response(request, events, graph, configurati
     try:
         for event in events:
             print_event(event, _printed)
-            last_message = await _get_last_ai_message(events)
+        last_message = _get_last_ai_message(events)
 
     except Exception as e:
-        traceback.print_exc()
-        error(f"process events and build response failed: ", e)
+        error(f"process events and build response failed: {e}")
         last_message = (
             f"I am sorry, I dont have sufficient information to fulfill your request."
         )
 
-    """
-    After processing the events, capture the state snapshot to determine the next action.
-    If the next action requires human intervention, generate a human-in-loop message.
-
-    Example: Before submitting the refill request,
-    the chatbot will ask the user if they would like to refill the prescription by confirming yes or no.    
-    """
     if not last_message:
         error(f"[GRAPH] No AI message returned | type={request.type} | session={request.session_id}")
         return PromptRecommendationResponse(
@@ -250,6 +215,9 @@ async def _process_events_and_build_response(request, events, graph, configurati
         RequestType.VERIFY_TESTS_EXACT.value,
         RequestType.LLM_JUDGE.value,
         RequestType.GET_BEHAVIORAL_RECOMMENDATIONS.value,
+        RequestType.GENERATE_SUGGESTIONS.value,
+        RequestType.ARENA_COMPARISON.value,
+        RequestType.DEEPEVAL_PROMPT_METRICS.value,
     ]:
         info(f"[PARSE] Parsing JSON result for type={request.type}")
         try:

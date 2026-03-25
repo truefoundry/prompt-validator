@@ -82,6 +82,7 @@ Protected (do not change unless a recommendation explicitly targets it):
 - The fundamental task the prompt performs
 - The output format/schema
 - The number and roles of message blocks
+- **All existing examples, few-shot samples, and sample query blocks** — NEVER remove, summarize, compress, merge, or paraphrase them. They must appear in the output verbatim and in full.
 
 Changeable (recommendations may freely modify):
 - Wording and phrasing
@@ -90,6 +91,18 @@ Changeable (recommendations may freely modify):
 - Constraint specificity
 - Formatting and hierarchy
 - Tone and instruction style
+
+---
+
+## SURGICAL EDIT PRINCIPLE
+
+Applying a recommendation means **inserting new content** or **modifying existing text in-place**. It does NOT mean rewriting the prompt from scratch.
+
+- ADD new sections, rules, or constraints where they fit logically.
+- MODIFY specific sentences or paragraphs that the recommendation directly targets.
+- LEAVE everything else — especially example blocks — exactly as it is.
+
+If you find yourself removing a large block of content that no recommendation explicitly targets, stop. That content must be preserved.
 
 ---
 

@@ -39,8 +39,10 @@ def fetch_live_spans(
     start_time: datetime | None = None,
     end_time: datetime | None = None,
     limit: int = 200,
+    tfy_host: str | None = None,
+    tfy_api_key: str | None = None,
 ) -> list[dict]:
-    """Fetch spans from TFY using credentials in trace/.env.
+    """Fetch spans from TFY.
 
     Args:
         hours: Hours to look back when start_time/end_time are not provided.
@@ -49,29 +51,29 @@ def fetch_live_spans(
         end_time: Explicit end datetime (UTC). If None, defaults to now.
         limit: Max number of spans to fetch. Caps SDK pagination so the call
                returns quickly instead of exhausting all pages.
+        tfy_host: TrueFoundry tenant base URL. If None, falls back to trace/.env / env vars.
+        tfy_api_key: TrueFoundry API key. If None, falls back to trace/.env / env vars.
 
     Note: FQN filtering is done client-side after fetching because the TFY API
     does not reliably support string operators on tfy.prompt_version_fqn.
     """
-    # Read credentials directly from trace/.env to avoid using the global
-    # truefoundry singleton which may have been initialised with different creds.
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-    try:
-        from dotenv import dotenv_values
-        env_vals = dotenv_values(env_path)
-    except ImportError:
-        import os as _os
-        env_vals = {}
-
-    tfy_host = env_vals.get("TFY_HOST") or os.environ.get("TFY_HOST", "")
-    tfy_api_key = env_vals.get("TFY_API_KEY") or os.environ.get("TFY_API_KEY", "")
+    # Explicit args take priority; fall back to trace/.env then environment variables.
+    if not tfy_host or not tfy_api_key:
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        try:
+            from dotenv import dotenv_values
+            env_vals = dotenv_values(env_path)
+        except ImportError:
+            env_vals = {}
+        tfy_host = tfy_host or env_vals.get("TFY_HOST") or os.environ.get("TFY_HOST", "")
+        tfy_api_key = tfy_api_key or env_vals.get("TFY_API_KEY") or os.environ.get("TFY_API_KEY", "")
 
     if not tfy_host:
-        raise ValueError("TFY_HOST not found in trace/.env")
+        raise ValueError("TFY_HOST not provided. Enter it in the UI or add it to trace/.env")
     if not tfy_api_key:
-        raise ValueError("TFY_API_KEY not found in trace/.env")
+        raise ValueError("TFY_API_KEY not provided. Enter it in the UI or add it to trace/.env")
 
-    from truefoundry_sdk import TrueFoundry, SortDirection, SpanAttributeFilter
+    from truefoundry_sdk import TrueFoundry, SpanAttributeFilter
     from truefoundry_sdk.types.span_attribute_filter_operator import SpanAttributeFilterOperator
 
     # Create a fresh client scoped to the FloQast tenant credentials
@@ -110,7 +112,7 @@ def fetch_live_spans(
         start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         filters=filters,
-        sort_direction=SortDirection.DESC,
+        sort_direction="desc",
         limit=limit,
     )
     spans = [span.model_dump() for span in raw_spans]

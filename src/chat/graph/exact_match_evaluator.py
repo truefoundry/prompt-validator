@@ -6,13 +6,18 @@ from src.common.service.logging.logger import info
 
 class ExactMatchEvaluator(PromptEvaluator):
     """Evaluator that performs exact matching between expected and actual outputs."""
-    
+
     async def evaluate_tests(self, all_tests, is_rag=False):
         """Evaluate tests by exact matching."""
+        info(f"[ExactMatch] evaluate_tests | total={len(all_tests)}")
+        passed = 0
         for test in all_tests:
             test["pass_status"] = (test['actual_output'] == test['expected_output'])
+            if test["pass_status"]:
+                passed += 1
+        info(f"[ExactMatch] Results | passed={passed}/{len(all_tests)}")
         return all_tests
-    
+
     def get_final_report(self, all_tests, evaluation_results=None):
         """Generate report with exact matching metrics."""
         y_true = [test['actual_output'] for test in all_tests if (test['actual_output'] is not None)]

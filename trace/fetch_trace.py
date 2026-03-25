@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
 
 from truefoundry import client
-from truefoundry_sdk import SortDirection, SpanAttributeFilter
+from truefoundry_sdk import SpanAttributeFilter
 from truefoundry_sdk.types.span_attribute_filter_operator import SpanAttributeFilterOperator
 
 DAYS = 90
@@ -33,7 +33,7 @@ for offset in range(0, DAYS, CHUNK_DAYS):
                     value="ChatCompletion",
                 ),
             ],
-            sort_direction=SortDirection.DESC,
+            sort_direction="desc",
         )
 
         chunk_count = 0

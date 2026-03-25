@@ -19,6 +19,7 @@ dependencies = [
     "redis>=6.2.0",
     "scikit-learn>=1.7.1",
     "streamlit>=1.46.1",
-    "truefoundry>=0.11.2",
+    "truefoundry>=0.14.2",
+    "truefoundry-sdk>=0.2.0",
     "uvicorn>=0.35.0",
 ]

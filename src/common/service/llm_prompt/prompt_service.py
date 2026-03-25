@@ -1,5 +1,6 @@
 import asyncio
 import re
+import traceback
 from typing import Dict, Any, Optional, List
 
 from fastapi import HTTPException
@@ -77,14 +78,18 @@ class PromptService:
             raise HTTPException(status_code=400, detail="prompt_fqn is required")
 
         try:
-            info(f"PromptService request model_name: {model_name}")
+            info(
+                f"[PromptService] get_prompt_response | fqn={prompt_fqn} | "
+                f"model={model_name} | max_tokens={max_tokens} | temperature={temperature} | "
+                f"reasoning_effort={reasoning_effort} | has_schema={response_schema is not None}"
+            )
             # Get prompt template
             prompt_version_response = client.prompt_versions.get_by_fqn(fqn=prompt_fqn)
             prompt_template = prompt_version_response.data.manifest
 
             # Render prompt with variables
             rendered_prompt = render_prompt(prompt_template, variables=data)
-            
+
             # Convert messages to LangChain message types
             messages: List[BaseMessage] = []
             for msg in rendered_prompt['messages']:
@@ -94,6 +99,8 @@ class PromptService:
                     messages.append(HumanMessage(content=msg['content']))
                 elif msg['role'] == 'assistant':
                     messages.append(AIMessage(content=msg['content']))
+
+            info(f"[PromptService] invoking LLM | messages={len(messages)} | roles={[m.__class__.__name__ for m in messages]}")
             # Get LLM and invoke
             llm = get_truefoundry_llm(
                 model_name=model_name,
@@ -103,10 +110,14 @@ class PromptService:
                 reasoning_effort=reasoning_effort,
             )
             response = await llm.ainvoke(messages)
+            info(f"[PromptService] LLM response received | response_len={len(response.content)}")
             return response.content
 
         except Exception as e:
-            error(f"Error getting prompt response: {e}")
+            error(
+                f"[PromptService] Error in get_prompt_response | fqn={prompt_fqn} | "
+                f"model={model_name} | {type(e).__name__}: {e}\n{traceback.format_exc()}"
+            )
             raise HTTPException(
                 status_code=500, detail=f"Failed to get prompt response: {str(e)}"
             ) from e
@@ -132,7 +143,11 @@ class PromptService:
             raise HTTPException(status_code=400, detail="system_prompt is required")
 
         try:
-            info(f"PromptService (raw text) request model_name: {model_name}")
+            info(
+                f"[PromptService] get_prompt_response_from_text | "
+                f"model={model_name} | max_tokens={max_tokens} | temperature={temperature} | "
+                f"reasoning_effort={reasoning_effort} | system_prompt_len={len(system_prompt)}"
+            )
             messages: List[BaseMessage] = [SystemMessage(content=system_prompt)]
 
             if user_prompt_template:
@@ -145,6 +160,7 @@ class PromptService:
             elif data.get("input"):
                 messages.append(HumanMessage(content=str(data["input"])))
 
+            info(f"[PromptService] invoking LLM (raw text) | messages={len(messages)}")
             llm = get_truefoundry_llm(
                 model_name=model_name,
                 response_schema=response_schema,
@@ -153,10 +169,14 @@ class PromptService:
                 reasoning_effort=reasoning_effort,
             )
             response = await llm.ainvoke(messages)
+            info(f"[PromptService] LLM response received | response_len={len(response.content)}")
             return response.content
 
         except Exception as e:
-            error(f"Error getting prompt response from text: {e}")
+            error(
+                f"[PromptService] Error in get_prompt_response_from_text | "
+                f"model={model_name} | {type(e).__name__}: {e}\n{traceback.format_exc()}"
+            )
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to get prompt response from text: {str(e)}",

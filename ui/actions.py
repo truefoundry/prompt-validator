@@ -108,6 +108,7 @@ def fetch_recommendations() -> None:
                     "Recommendations fetched successfully. "
                     "Note: prompt content could not be loaded for display."
                 )
+
         except requests.RequestException as exc:
             st.error(f"Failed to fetch recommendations: {exc}")
         except ValueError as exc:
@@ -241,6 +242,12 @@ def run_enhance_evaluation() -> None:
         return
 
     reasoning = st.session_state.reasoning_effort
+    selected_metrics = st.session_state.get("enhance_eval_selected_metrics") or [
+        "clarity", "completeness", "accuracy", "conciseness", "professional_tone"
+    ]
+    enh_model = (st.session_state.get("enhance_eval_enh_model_name") or "").strip() or None
+    enh_effort = st.session_state.get("enhance_eval_enh_reasoning_effort", "none")
+
     payload = {
         "sessionId": st.session_state.session_id,
         "systemPrompt": original_prompt,
@@ -253,6 +260,11 @@ def run_enhance_evaluation() -> None:
         "isRAG": False,
         "testCases": test_cases,
         "recommendations": None,
+        "judgeMetrics": selected_metrics,
+        "enhancedModelName": enh_model,
+        "enhancedTemperature": st.session_state.get("enhance_eval_enh_temperature") if enh_model else None,
+        "enhancedMaxTokens": st.session_state.get("enhance_eval_enh_max_tokens") if enh_model else None,
+        "enhancedReasoningEffort": (enh_effort if enh_effort != "none" else None) if enh_model else None,
     }
 
     with st.spinner("Running LLM-as-judge evaluation..."):

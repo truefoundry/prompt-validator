@@ -1,4 +1,5 @@
 import time
+import traceback
 from typing import Any
 
 from fastapi import FastAPI, status, HTTPException
@@ -43,7 +44,7 @@ async def chat(request: PromptRecommendationRequest) -> tuple[PromptRecommendati
         elapsed = round(time.time() - t0, 2)
         error(
             f"[ERROR] type={request.type} | session={request.session_id} | "
-            f"elapsed={elapsed}s | {e}"
+            f"elapsed={elapsed}s | {type(e).__name__}: {e}\n{traceback.format_exc()}"
         )
         raise HTTPException(
             status_code=500, detail="Failed to fetch agent response"

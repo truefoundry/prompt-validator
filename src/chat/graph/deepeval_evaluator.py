@@ -9,14 +9,14 @@ from langchain_community.chat_models import ChatOpenAI
 from src.chat.graph.base_evaluator import PromptEvaluator
 from src.chat.utils.llm_models import TrueFoundryLLM, get_truefoundry_llm
 from langchain_openai import AzureChatOpenAI
-from src.common.service.logging.logger import info
+from src.common.service.logging.logger import error, info
 
 class DeepEvalPromptEvaluator(PromptEvaluator):
     """Evaluator that uses DeepEval metrics for evaluation."""
     
     async def get_all_metrics(self, is_rag):
         """Get all DeepEval metrics."""
-        # get the llm to be used as judge - use TrueFoundry LLM wrapped in DeepEval adapter
+        info(f"[DeepEvalEvaluator] Building metrics | model={self.model_name} | is_rag={is_rag}")
         custom_llm = TrueFoundryLLM(model=get_truefoundry_llm(
             self.model_name,
             max_tokens=self.max_tokens,
@@ -65,37 +65,30 @@ class DeepEvalPromptEvaluator(PromptEvaluator):
     
     async def evaluate_tests(self, all_tests, is_rag=False):
         """Evaluate tests using DeepEval metrics."""
-        # Get all metrics
+        info(f"[DeepEvalEvaluator] evaluate_tests | total={len(all_tests)} | is_rag={is_rag}")
         all_metrics = await self.get_all_metrics(is_rag)
-        info(f"All metrics: {all_metrics}")
+        metric_names = [m[1] for m in all_metrics]
+        info(f"[DeepEvalEvaluator] Metrics to run: {metric_names}")
 
-        llm_test_cases = list()
+        llm_test_cases = []
+        skipped = 0
         for test_case in all_tests:
-            """
-            if is_rag:
-                llm_test_cases.append(
-                    LLMTestCase(
-                        input=test_case["input"],
-                        actual_output=test_case["actual_output"],
-                        expected_output=test_case["expected_output"],
-                        retrieval_context=test_case["retrieval_context"]
-                        )
-                    )
-            else:
-            """
+            if test_case.get("actual_output") is None:
+                skipped += 1
+                continue
             llm_test_cases.append(
                 LLMTestCase(
                     input=test_case["data"]["input"],
                     actual_output=test_case["actual_output"],
                     expected_output=test_case["expected_output"]
-                    )
                 )
+            )
 
-        info("LLM test cases created.")
+        info(f"[DeepEvalEvaluator] LLM test cases created | valid={len(llm_test_cases)} | skipped={skipped}")
 
         error_config = ErrorConfig(ignore_errors=True)
         result = evaluate(llm_test_cases, [m[0] for m in all_metrics], error_config=error_config)
-        info("Evaluation completed.")
+        info(f"[DeepEvalEvaluator] DeepEval evaluation completed | results={len(result.test_results)}")
         test_results = result.test_results
         test_results.sort(key=lambda x: int(x.name.split("_")[-1]))
 

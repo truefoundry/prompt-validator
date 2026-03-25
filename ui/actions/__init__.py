@@ -3,6 +3,7 @@ from .recommendations import fetch_recommendations, apply_recommendations, fetch
 from .evaluation import (
     run_enhance_evaluation,
     generate_overall_suggestions,
+    generate_enhance_suggestions,
     run_deepeval_prompt_metrics,
     apply_judge_recommendations,
     run_tests_with_file,
@@ -18,6 +19,7 @@ __all__ = [
     "fetch_behavioral_recommendations",
     "run_enhance_evaluation",
     "generate_overall_suggestions",
+    "generate_enhance_suggestions",
     "run_deepeval_prompt_metrics",
     "apply_judge_recommendations",
     "run_tests_with_file",

@@ -1,0 +1,298 @@
+/* ── Base & Typography ───────────────────────────────────────────────────── */
+html, body, [class*="css"] {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif !important;
+}
+.main .block-container,
+.stMainBlockContainer,
+[data-testid="stMain"] .block-container {
+    padding-top: 0 !important;
+    padding-bottom: 2rem !important;
+    max-width: 1400px !important;
+}
+[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 0 !important;
+    min-height: 0 !important;
+}
+
+/* ── Tabs — dark theme pill style ────────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 2px !important;
+    background: #1e293b !important;
+    border-radius: 12px !important;
+    padding: 4px !important;
+    border: 1px solid #334155 !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25) !important;
+    margin-bottom: 20px !important;
+}
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px !important;
+    padding: 8px 18px !important;
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    color: #94a3b8 !important;
+    background: transparent !important;
+    border: none !important;
+    white-space: nowrap !important;
+    transition: all 0.2s ease !important;
+    height: auto !important;
+}
+.stTabs [data-baseweb="tab"]:hover {
+    color: #e2e8f0 !important;
+    background: rgba(99,102,241,0.12) !important;
+}
+.stTabs [aria-selected="true"] {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.4) !important;
+}
+.stTabs [data-baseweb="tab-highlight"] { background-color: transparent !important; }
+.stTabs [data-baseweb="tab-border"] { background-color: transparent !important; height: 0 !important; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.stButton > button {
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 0.875rem !important;
+    padding: 0.45rem 1.1rem !important;
+    transition: all 0.2s ease !important;
+    border: 1.5px solid #334155 !important;
+    color: #cbd5e1 !important;
+    background: #1e293b !important;
+}
+.stButton > button p,
+.stButton > button span {
+    color: #cbd5e1 !important;
+    font-weight: 600 !important;
+}
+.stButton > button:hover {
+    border-color: #6366f1 !important;
+    color: #a5b4fc !important;
+    background: rgba(99,102,241,0.12) !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(99,102,241,0.2) !important;
+}
+.stButton > button:hover p,
+.stButton > button:hover span {
+    color: #a5b4fc !important;
+}
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.35) !important;
+}
+.stButton > button[kind="primary"] p,
+.stButton > button[kind="primary"] span {
+    color: white !important;
+    font-weight: 700 !important;
+}
+.stButton > button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+    box-shadow: 0 4px 16px rgba(99,102,241,0.45) !important;
+    transform: translateY(-1px) !important;
+    color: white !important;
+}
+.stButton > button[kind="primary"]:hover p,
+.stButton > button[kind="primary"]:hover span {
+    color: white !important;
+}
+.stButton > button:disabled { opacity: 0.45 !important; transform: none !important; box-shadow: none !important; }
+[data-testid="stDownloadButton"] > button {
+    background: #f0fdf4 !important; color: #15803d !important;
+    border: 1.5px solid #86efac !important; border-radius: 8px !important;
+    font-weight: 600 !important;
+}
+[data-testid="stDownloadButton"] > button:hover {
+    background: #dcfce7 !important; transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(21,128,61,0.15) !important;
+}
+
+/* ── Metrics ─────────────────────────────────────────────────────────────── */
+[data-testid="stMetric"] {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    padding: 16px 18px !important;
+    transition: box-shadow 0.2s, transform 0.2s !important;
+}
+[data-testid="stMetric"]:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08) !important;
+    transform: translateY(-1px) !important;
+}
+[data-testid="stMetricLabel"] div {
+    font-size: 0.7rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.07em !important;
+    color: #94a3b8 !important;
+}
+[data-testid="stMetricValue"] div { font-size: 1.55rem !important; font-weight: 700 !important; color: #1e293b !important; }
+[data-testid="stMetricDelta"] div { font-size: 0.8rem !important; font-weight: 600 !important; }
+
+/* ── Expanders ───────────────────────────────────────────────────────────── */
+[data-testid="stExpander"] {
+    border: 1px solid rgba(99,102,241,0.2) !important;
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    margin-bottom: 8px !important;
+    transition: box-shadow 0.2s, border-color 0.2s !important;
+    background: rgba(255,255,255,0.03) !important;
+}
+[data-testid="stExpander"]:hover {
+    box-shadow: 0 2px 12px rgba(99,102,241,0.12) !important;
+    border-color: rgba(99,102,241,0.35) !important;
+}
+[data-testid="stExpander"] summary {
+    font-weight: 500 !important;
+    font-size: 0.9rem !important;
+    color: #cbd5e1 !important;
+    background: rgba(15,23,42,0.6) !important;
+    padding: 10px 16px !important;
+}
+[data-testid="stExpander"] summary:hover {
+    background: rgba(99,102,241,0.08) !important;
+    color: #e2e8f0 !important;
+}
+
+/* ── File uploader ───────────────────────────────────────────────────────── */
+[data-testid="stFileUploader"] section {
+    border: 2px dashed #334155 !important;
+    border-radius: 10px !important;
+    background: rgba(15,23,42,0.5) !important;
+    transition: all 0.2s !important;
+}
+[data-testid="stFileUploader"] section:hover { border-color: #6366f1 !important; background: rgba(99,102,241,0.08) !important; }
+[data-testid="stFileUploader"] section * { color: #94a3b8 !important; }
+
+/* ── Inputs & Textareas ──────────────────────────────────────────────────── */
+.stTextInput input, .stTextArea textarea, .stNumberInput input {
+    border-radius: 8px !important;
+    border: 1.5px solid #334155 !important;
+    font-size: 0.875rem !important;
+    transition: border-color 0.2s, box-shadow 0.2s !important;
+    background: #0f172a !important;
+    color: #e2e8f0 !important;
+    -webkit-text-fill-color: #e2e8f0 !important;
+}
+.stTextInput input::placeholder, .stTextArea textarea::placeholder {
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
+}
+.stTextInput input:focus, .stTextArea textarea:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.15) !important;
+    outline: none !important;
+    background: #0f172a !important;
+    color: #e2e8f0 !important;
+    -webkit-text-fill-color: #e2e8f0 !important;
+}
+.stTextArea textarea:disabled {
+    -webkit-text-fill-color: #94a3b8 !important;
+    background: #0f172a !important;
+    opacity: 1 !important;
+}
+
+/* ── Sidebar — dark theme ────────────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%) !important;
+    border-right: 1px solid #1e3a5f !important;
+}
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span,
+[data-testid="stSidebar"] label, [data-testid="stSidebar"] h3,
+[data-testid="stSidebar"] .stMarkdown p { color: #cbd5e1 !important; }
+[data-testid="stSidebar"] h3 { color: #e2e8f0 !important; font-weight: 600 !important; }
+[data-testid="stSidebar"] .stTextInput input,
+[data-testid="stSidebar"] .stNumberInput input {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid #334155 !important;
+    color: #e2e8f0 !important;
+    -webkit-text-fill-color: #e2e8f0 !important;
+}
+[data-testid="stSidebar"] .stTextInput input:focus,
+[data-testid="stSidebar"] .stNumberInput input:focus {
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.25) !important;
+    background: rgba(255,255,255,0.08) !important;
+}
+[data-testid="stSidebar"] [data-baseweb="select"] > div:first-child {
+    background: rgba(255,255,255,0.06) !important;
+    border: 1px solid #334155 !important;
+    border-radius: 8px !important;
+}
+[data-testid="stSidebar"] [data-baseweb="select"] span { color: #e2e8f0 !important; }
+[data-testid="stSidebar"] hr { border-color: #1e3a5f !important; margin: 12px 0 !important; }
+[data-testid="stSidebar"] [data-testid="stToggle"] { color: #cbd5e1 !important; }
+
+/* ── DataFrames ──────────────────────────────────────────────────────────── */
+[data-testid="stDataFrame"] {
+    border-radius: 10px !important;
+    overflow: hidden !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
+}
+
+/* ── Alerts ──────────────────────────────────────────────────────────────── */
+[data-testid="stAlert"] { border-radius: 10px !important; font-size: 0.875rem !important; }
+
+/* ── Captions ────────────────────────────────────────────────────────────── */
+[data-testid="stCaptionContainer"] p { color: #64748b !important; font-size: 0.8rem !important; }
+
+/* ── Dividers ────────────────────────────────────────────────────────────── */
+hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 1.5rem 0 !important; }
+
+/* ── Checkboxes ──────────────────────────────────────────────────────────── */
+[data-testid="stCheckbox"] { padding: 3px 0 !important; }
+
+/* ── Select boxes ────────────────────────────────────────────────────────── */
+.stSelectbox [data-baseweb="select"] > div:first-child {
+    border-radius: 8px !important;
+    border: 1.5px solid #e2e8f0 !important;
+    transition: border-color 0.2s !important;
+}
+.stSelectbox [data-baseweb="select"] > div:first-child:hover { border-color: #6366f1 !important; }
+
+/* ── Code blocks ─────────────────────────────────────────────────────────── */
+.stCode { border-radius: 8px !important; }
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+[data-testid="stSpinner"] > div { border-top-color: #6366f1 !important; }
+
+/* ── Section header utility class ────────────────────────────────────────── */
+.pt-section-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 20px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.12) 0%, rgba(79,70,229,0.08) 100%);
+    border: 1px solid rgba(99,102,241,0.25);
+    border-left: 4px solid #6366f1;
+    border-radius: 0 10px 10px 0;
+    margin: 20px 0 14px 0;
+}
+.pt-section-header .pt-step {
+    background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    color: white;
+    width: 26px; height: 26px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.72rem; font-weight: 700; flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(99,102,241,0.4);
+}
+.pt-section-header .pt-icon { font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+.pt-section-header .pt-title { font-size: 0.95rem; font-weight: 700; color: #e2e8f0 !important; margin: 0; }
+.pt-section-header .pt-desc { font-size: 0.78rem; color: #94a3b8 !important; margin: 3px 0 0 0; }
+
+/* ── Main content text — ensure visibility on dark bg ────────────────────── */
+[data-testid="stMain"] h1, [data-testid="stMain"] h2, [data-testid="stMain"] h3 {
+    color: #e2e8f0 !important;
+}
+[data-testid="stMain"] .stMarkdown p,
+[data-testid="stMain"] p {
+    color: #94a3b8 !important;
+}
+[data-testid="stMain"] label,
+[data-testid="stMain"] [data-testid="stWidgetLabel"] p {
+    color: #cbd5e1 !important;
+}
+[data-testid="stMain"] [data-testid="stMarkdownContainer"] > p:first-child {
+    color: #94a3b8 !important;
+}

@@ -1,5 +1,3 @@
-import json
-
 import requests
 import streamlit as st
 
@@ -26,6 +24,9 @@ def run_enhance_evaluation() -> None:
         return
 
     reasoning = st.session_state.reasoning_effort
+    enh_model = (st.session_state.get("enhance_eval_enh_model_name") or "").strip() or None
+    enh_reasoning = st.session_state.get("enhance_eval_enh_reasoning_effort", "none")
+
     payload = {
         "sessionId": st.session_state.session_id,
         "systemPrompt": original_prompt,
@@ -38,6 +39,11 @@ def run_enhance_evaluation() -> None:
         "isRAG": False,
         "testCases": test_cases,
         "recommendations": None,
+        "enhancedModelName": enh_model,
+        "enhancedTemperature": st.session_state.get("enhance_eval_enh_temperature") if enh_model else None,
+        "enhancedMaxTokens": st.session_state.get("enhance_eval_enh_max_tokens") if enh_model else None,
+        "enhancedReasoningEffort": (enh_reasoning if enh_reasoning != "none" else None) if enh_model else None,
+        "judgeMetrics": st.session_state.get("enhance_eval_selected_metrics"),
     }
 
     with st.spinner("Running LLM-as-judge evaluation..."):
@@ -56,121 +62,76 @@ def run_enhance_evaluation() -> None:
             st.error(f"Unexpected error: {exc}")
 
 
-def generate_overall_suggestions() -> None:
-    """Generate holistic, priority-ranked suggestions from trace evaluation results via a single LLM call."""
-    judge_result = st.session_state.get("trace_llm_judge_result")
+def _generate_suggestions(
+    *,
+    judge_key: str,
+    original_prompt_key: str,
+    enhanced_prompt_key: str,
+    result_key: str,
+    spinner_msg: str,
+    no_judge_error: str,
+) -> None:
+    """Generate holistic, priority-ranked suggestions from a judge result."""
+    judge_result = st.session_state.get(judge_key)
     if not judge_result:
-        st.error("Run LLM Judge on traces first before generating suggestions.")
+        st.error(no_judge_error)
         return
 
-    original_prompt = st.session_state.get("trace_original_system_prompt", "").strip()
-    enhanced_prompt = st.session_state.get("trace_enhanced_system_prompt", "").strip()
+    original_prompt = st.session_state.get(original_prompt_key, "").strip()
+    enhanced_prompt = st.session_state.get(enhanced_prompt_key, "").strip()
+    reasoning = st.session_state.reasoning_effort
 
-    summary = judge_result.get("summary", {})
-    test_results = judge_result.get("test_results", [])
-    metrics = ["clarity", "completeness", "accuracy", "conciseness", "professional_tone", "overall"]
-
-    # Build metrics table string
-    avg_orig = summary.get("avg_original", {})
-    avg_enh = summary.get("avg_enhanced", {})
-    avg_delta = summary.get("avg_delta", {})
-    metrics_lines = ["Metric | Original | Enhanced | Delta"]
-    metrics_lines.append("--- | --- | --- | ---")
-    for m in metrics:
-        o = avg_orig.get(m)
-        e = avg_enh.get(m)
-        d = avg_delta.get(m)
-        metrics_lines.append(
-            f"{m.replace('_', ' ').title()} | "
-            f"{f'{o:.2f}' if o is not None else '—'} | "
-            f"{f'{e:.2f}' if e is not None else '—'} | "
-            f"{f'{d:+.2f}' if d is not None else '—'}"
-        )
-    metrics_table = "\n".join(metrics_lines)
-
-    # Collect all key differences and improvement summaries
-    all_differences: list[str] = []
-    all_summaries: list[str] = []
-    for i, tr in enumerate(test_results):
-        scores = tr.get("scores", {})
-        for d in scores.get("key_differences", []):
-            if d and d not in all_differences:
-                all_differences.append(d)
-        s = scores.get("improvement_summary", "")
-        if s:
-            all_summaries.append(f"Test {i+1}: {s}")
-
-    improved = summary.get("improved_count", 0)
-    total = summary.get("total_cases", 0)
-
-    system_prompt = """You are an expert prompt engineer. You will be given evaluation data comparing an original system prompt against an enhanced version, tested on real inputs.
-
-Your job is to analyse the evaluation holistically and generate a concise, prioritised list of actionable improvement suggestions for the enhanced prompt.
-
-Output ONLY valid JSON. No markdown, no explanation outside the JSON.
-
-{
-  "overall_analysis": "<2-3 sentence summary of what the evaluation reveals overall>",
-  "suggestions": [
-    {
-      "priority": "HIGH" | "MEDIUM" | "LOW",
-      "title": "<short title>",
-      "suggestion": "<concrete, actionable instruction for improving the enhanced prompt>",
-      "rationale": "<why this matters based on the metrics and differences observed>"
+    payload = {
+        "sessionId": st.session_state.session_id,
+        "systemPrompt": original_prompt or "placeholder",
+        "enhancedSystemPrompt": enhanced_prompt,
+        "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": 0.2,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
+        "type": "generate_suggestions",
+        "recommendations": None,
+        "judgeResult": judge_result,
     }
-  ]
-}
 
-Rules:
-- Prioritise by impact: HIGH = fixes a consistent regression or large delta gap, MEDIUM = addresses a pattern seen in multiple tests, LOW = polish or edge-case improvement
-- Suggestions must be specific and actionable (e.g. "Add a fallback instruction for X scenario" not "improve clarity")
-- Do not suggest things already clearly working well
-- Maximum 6 suggestions, minimum 2
-- Base everything strictly on the data provided"""
-
-    user_message = f"""## Evaluation Summary
-Improved in {improved}/{total} test case(s).
-
-## Metric Scores (averages across all test cases)
-{metrics_table}
-
-## Key Differences Observed
-{chr(10).join(f'- {d}' for d in all_differences) if all_differences else 'None noted.'}
-
-## Per-Test Improvement Summaries
-{chr(10).join(all_summaries) if all_summaries else 'None noted.'}
-
-## Original Prompt (first 800 chars)
-{original_prompt[:800]}{'...' if len(original_prompt) > 800 else ''}
-
-## Enhanced Prompt (first 800 chars)
-{enhanced_prompt[:800]}{'...' if len(enhanced_prompt) > 800 else ''}"""
-
-    with st.spinner("Generating overall suggestions..."):
+    with st.spinner(spinner_msg):
         try:
-            from src.chat.utils.llm_models import TrueFoundryLLM, get_truefoundry_llm
-            from langchain.schema import SystemMessage, HumanMessage
-            llm = TrueFoundryLLM(model=get_truefoundry_llm(
-                model_name=st.session_state.model_name.strip() if st.session_state.model_name else None,
-                max_tokens=st.session_state.max_tokens,
-                temperature=0.2,
-            ))
-            raw = llm.generate([SystemMessage(content=system_prompt), HumanMessage(content=user_message)])
-            # Strip markdown fences if present
-            cleaned = raw.strip()
-            if cleaned.startswith("```"):
-                cleaned = cleaned.split("\n", 1)[-1]
-                cleaned = cleaned.rsplit("```", 1)[0]
-            result = json.loads(cleaned)
-            st.session_state.trace_suggestions_result = result
-        except json.JSONDecodeError as exc:
-            st.error(f"LLM returned non-JSON: {exc}\n\nRaw: {raw[:300]}")
+            data = post_chat(payload, include_grid_header=False)
+            result = extract_test_evaluation_result(data)
+            if result:
+                st.session_state[result_key] = result
+            else:
+                st.warning("No suggestions returned.")
+        except requests.RequestException as exc:
+            st.error(f"Request failed: {exc}")
         except Exception as exc:
             st.error(f"Suggestion generation failed: {exc}")
 
 
+def generate_overall_suggestions() -> None:
+    _generate_suggestions(
+        judge_key="trace_llm_judge_result",
+        original_prompt_key="trace_original_system_prompt",
+        enhanced_prompt_key="trace_enhanced_system_prompt",
+        result_key="trace_suggestions_result",
+        spinner_msg="Generating overall suggestions...",
+        no_judge_error="Run LLM Judge on traces first before generating suggestions.",
+    )
+
+
+def generate_enhance_suggestions() -> None:
+    _generate_suggestions(
+        judge_key="enhance_eval_judge_result",
+        original_prompt_key="enhance_eval_orig_prompt",
+        enhanced_prompt_key="enhance_eval_enh_prompt",
+        result_key="enhance_eval_suggestions_result",
+        spinner_msg="Generating suggestions...",
+        no_judge_error="Run LLM Judge evaluation first before generating suggestions.",
+    )
+
+
 def run_deepeval_prompt_metrics() -> None:
-    """Run DeepEval reference-free metrics on trace judge evaluation results."""
+    """Run DeepEval reference-free metrics by delegating to the backend."""
     judge_result = st.session_state.get("trace_llm_judge_result")
     if not judge_result:
         st.error("Run LLM Judge on traces first — DeepEval metrics use those outputs.")
@@ -193,24 +154,31 @@ def run_deepeval_prompt_metrics() -> None:
     geval_criteria = st.session_state.get("trace_deepeval_metrics_geval_criteria", "").strip()
     raw_instructions = st.session_state.get("trace_deepeval_metrics_prompt_instructions", "").strip()
     prompt_instructions = [l.strip() for l in raw_instructions.splitlines() if l.strip()] if raw_instructions else []
+    reasoning = st.session_state.reasoning_effort
+
+    payload = {
+        "sessionId": st.session_state.session_id,
+        "modelName": st.session_state.model_name.strip() if st.session_state.model_name else None,
+        "maxTokens": st.session_state.max_tokens,
+        "temperature": 0.0,
+        "reasoningEffort": reasoning if reasoning != "none" else None,
+        "type": "deepeval_prompt_metrics",
+        "recommendations": None,
+        "testCases": test_cases,
+        "gevalCriteria": geval_criteria,
+        "promptInstructions": prompt_instructions,
+    }
 
     with st.spinner("Running DeepEval metrics (this may take a moment)..."):
         try:
-            from src.chat.utils.llm_models import TrueFoundryLLM, get_truefoundry_llm
-            from src.chat.graph.deepeval_prompt_metrics import run_deepeval_prompt_metrics as _run
-            llm = TrueFoundryLLM(model=get_truefoundry_llm(
-                model_name=st.session_state.model_name.strip() if st.session_state.model_name else None,
-                max_tokens=st.session_state.max_tokens,
-                temperature=0.0,
-                reasoning_effort=st.session_state.get("reasoning_effort") or None,
-            ))
-            result = _run(
-                test_cases=test_cases,
-                llm=llm,
-                geval_criteria=geval_criteria,
-                prompt_instructions=prompt_instructions,
-            )
-            st.session_state.trace_deepeval_metrics_result = result
+            data = post_chat(payload, include_grid_header=False)
+            result = extract_test_evaluation_result(data)
+            if result:
+                st.session_state.trace_deepeval_metrics_result = result
+            else:
+                st.warning("DeepEval metrics returned no result.")
+        except requests.RequestException as exc:
+            st.error(f"Request failed: {exc}")
         except Exception as exc:
             st.error(f"DeepEval metrics failed: {exc}")
 

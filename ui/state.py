@@ -52,6 +52,16 @@ def init_session_state() -> None:
         "enhance_eval_judge_result": None,
         "enhance_eval_api_debug_original": {},
         "enhance_eval_judge_recs_selected": [],
+        # Metric picker
+        "enhance_eval_selected_metrics": ["clarity", "completeness", "accuracy", "conciseness", "professional_tone"],
+        # Enhanced prompt model override
+        "enhance_eval_enh_model_name": "",
+        "enhance_eval_enh_temperature": 0.1,
+        "enhance_eval_enh_max_tokens": 15000,
+        "enhance_eval_enh_reasoning_effort": "none",
+        # Trace credentials
+        "trace_tfy_host": "",
+        "trace_tfy_api_key": "",
         # Trace Evaluation tab
         "trace_inputs": [],
         "trace_applications": [],
@@ -70,6 +80,9 @@ def init_session_state() -> None:
         # Arena Evaluation (Enhance tab)
         "arena_eval_result": None,
         "arena_eval_criteria": "Choose the response that is more accurate, complete, and professional.",
+        # Enhance tab — suggestions
+        "enhance_eval_suggestions_result": None,
+        "enhance_eval_suggestions_selected": [],
         # Trace eval — suggestions + DeepEval metrics
         "trace_suggestions_result": None,
         "trace_suggestions_selected": [],

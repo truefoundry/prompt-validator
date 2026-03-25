@@ -1,18 +1,19 @@
+import pandas as pd
 import streamlit as st
 
 from ..actions import generate_overall_suggestions, run_deepeval_prompt_metrics
-from ..components import render_diff
+from ..components import render_diff, render_section_header
 from ..trace_actions import (
     fetch_live_trace_inputs,
-    load_floqast_prompts,
     load_trace_inputs,
     run_llm_judge_on_traces,
     run_trace_pipeline,
 )
 from .enhance import _render_overall_suggestions
+from src.chat.graph.llm_judge_evaluator import DEFAULT_METRICS
 
 
-_JUDGE_METRICS = ["clarity", "completeness", "accuracy", "conciseness", "professional_tone", "overall"]
+_JUDGE_METRICS = DEFAULT_METRICS + ["overall"]
 
 _METRIC_LABELS = {
     "answer_relevancy": "Answer Relevancy",
@@ -28,15 +29,6 @@ _INPUT_MODES = ("TFY Prompt FQN", "Paste Prompt Text")
 
 _TRACE_SOURCE_OPTIONS = ("Fetch Live Traces", "Use traces.json", "Upload file")
 
-
-def _get_tfy_tenant() -> str:
-    """Extract tenant name from prompt FQN stored in session."""
-    fqn = st.session_state.get("prompt_fqn", "")
-    if fqn and "/" in fqn:
-        parts = fqn.split("/")
-        if len(parts) >= 2:
-            return parts[1]
-    return ""
 
 
 def _render_prompt_input(mode_key: str, fqn_key: str, sys_key: str, user_tpl_key: str, *, fqn_widget_key: str | None = None) -> None:
@@ -137,8 +129,6 @@ def _render_deepeval_prompt_metrics(result: dict) -> None:
 
 def _render_llm_judge_results(result: dict) -> None:
     """Render LLM judge comparison results: aggregate metrics, per-test details, recommendations."""
-    import pandas as pd
-
     summary = result.get("summary", {})
     test_results = result.get("test_results", [])
 
@@ -237,14 +227,23 @@ def _render_llm_judge_results(result: dict) -> None:
                         st.markdown(f"- {d}")
 
 
+@st.fragment
 def render_trace_eval_tab() -> None:
-    st.subheader("Trace Evaluation")
-    st.caption(
-        "Load real production traces, group by prompt, then compare original vs enhanced prompt quality using LLM-as-judge."
+    st.markdown(
+        """<div style="margin-bottom:20px;">
+  <h2 style="margin:0 0 4px 0;font-size:1.3rem;font-weight:700;color:#1e293b;">
+    Trace Evaluation
+  </h2>
+  <p style="margin:0;font-size:0.875rem;color:#64748b;line-height:1.5;">
+    Load real production traces, group by prompt, then compare original vs enhanced
+    prompt quality using LLM-as-judge at scale.
+  </p>
+</div>""",
+        unsafe_allow_html=True,
     )
 
     # ── Section A: Load Traces ──────────────────────────────────────────────
-    st.write("### 1. Load Traces")
+    render_section_header("📡", "Load Traces", "Fetch live traces, load from file, or use traces.json", step=1)
 
     source_label = st.radio(
         "Trace source",
@@ -255,6 +254,20 @@ def render_trace_eval_tab() -> None:
 
     uploaded_content: str | None = None
     if source_label == "Fetch Live Traces":
+        col_host, col_key = st.columns(2)
+        st.session_state.trace_tfy_host = col_host.text_input(
+            "TFY Host",
+            value=st.session_state.get("trace_tfy_host", ""),
+            placeholder="https://your-tenant.truefoundry.com",
+            key="trace_tfy_host_input",
+        )
+        st.session_state.trace_tfy_api_key = col_key.text_input(
+            "TFY API Key",
+            value=st.session_state.get("trace_tfy_api_key", ""),
+            placeholder="Enter your TrueFoundry API key",
+            type="password",
+            key="trace_tfy_api_key_input",
+        )
         col_hrs, col_limit, col_fqn = st.columns([1, 1, 3])
         live_days = col_hrs.number_input(
             "Days back", min_value=1, max_value=90, value=1, step=1, key="trace_live_days"
@@ -278,12 +291,24 @@ def render_trace_eval_tab() -> None:
 
     _SOURCE_MAP = {"Use traces.json": "traces.json", "Upload file": "upload"}
 
-    if st.button("Load Traces", width="stretch", key="trace_load_btn"):
+    _missing_creds = (
+        source_label == "Fetch Live Traces"
+        and not (
+            st.session_state.get("trace_tfy_host", "").strip()
+            and st.session_state.get("trace_tfy_api_key", "").strip()
+        )
+    )
+    if _missing_creds:
+        st.caption("Enter TFY Host and API Key above to enable live trace fetching.")
+
+    if st.button("Load Traces", width="stretch", key="trace_load_btn", disabled=_missing_creds):
         if source_label == "Fetch Live Traces":
             fetch_live_trace_inputs(
                 hours=int(st.session_state.get("trace_live_days", 1)) * 24,
                 limit=int(st.session_state.get("trace_live_limit", 200)),
                 fqn_filter=st.session_state.get("trace_live_fqn", "").strip() or None,
+                tfy_host=st.session_state.get("trace_tfy_host", "").strip(),
+                tfy_api_key=st.session_state.get("trace_tfy_api_key", "").strip(),
             )
         else:
             load_trace_inputs(
@@ -297,7 +322,7 @@ def render_trace_eval_tab() -> None:
 
     # ── Section B: Group by Prompt FQN ─────────────────────────────────────
     st.divider()
-    st.write("### 2. Select Prompt Group")
+    render_section_header("🗂️", "Select Prompt Group", "Pick a prompt FQN and select traces to evaluate", step=2)
 
     # Build FQN options with counts
     fqn_counts: dict[str, int] = {}
@@ -327,10 +352,15 @@ def render_trace_eval_tab() -> None:
         "",
     )
 
-    import pandas as pd
+    # Build an O(1) id → index map once rather than calling list.index() per row (O(n) each).
+    _trace_id_to_idx: dict[int, int] = {id(ti): i for i, ti in enumerate(trace_inputs)}
 
     display_rows = filtered[:30]
-    all_display_indices = [trace_inputs.index(ti) for ti in display_rows]
+    all_display_indices = [_trace_id_to_idx[id(ti)] for ti in display_rows]
+    # Reverse map for O(1) "which display row number is this original index?" lookups.
+    _display_orig_to_row: dict[int, int] = {
+        orig_idx: row_num for row_num, orig_idx in enumerate(all_display_indices, 1)
+    }
 
     # Build display DataFrame with truncated text for the table view
     def _trunc(s: str, n: int = 100) -> str:
@@ -339,7 +369,7 @@ def render_trace_eval_tab() -> None:
 
     table_data = []
     for i, ti in enumerate(display_rows):
-        orig_idx = trace_inputs.index(ti)
+        orig_idx = _trace_id_to_idx[id(ti)]
         table_data.append({
             "#": i + 1,
             "User Input": _trunc(ti.user_message or "", 120),
@@ -368,15 +398,21 @@ def render_trace_eval_tab() -> None:
     row_options = [f"#{r['#']}  {_trunc(display_rows[r['#']-1].user_message or '', 80)}" for r in table_data]
     row_option_to_orig = {opt: table_data[i]["_orig_idx"] for i, opt in enumerate(row_options)}
 
-    prev_selected_orig = set(st.session_state.get("trace_selected_indices", []))
-    prev_selected_options = [opt for opt, idx in row_option_to_orig.items() if idx in prev_selected_orig]
+    # Apply pending select-all / clear BEFORE the widget is instantiated
+    if st.session_state.pop("_trace_select_all_pending", False):
+        st.session_state["trace_multiselect"] = row_options
+    elif st.session_state.pop("_trace_clear_pending", False):
+        st.session_state["trace_multiselect"] = []
+    elif "trace_multiselect" not in st.session_state:
+        # First render only: seed from previously selected indices
+        prev_selected_orig = set(st.session_state.get("trace_selected_indices", []))
+        st.session_state["trace_multiselect"] = [opt for opt, idx in row_option_to_orig.items() if idx in prev_selected_orig]
 
     col_multi, col_btns = st.columns([3, 1])
     with col_multi:
         chosen_options = st.multiselect(
             "Select traces to evaluate",
             options=row_options,
-            default=prev_selected_options,
             key="trace_multiselect",
             placeholder="Click to pick traces, or use Select All →",
         )
@@ -384,11 +420,11 @@ def render_trace_eval_tab() -> None:
         st.write("")  # vertical align
         st.write("")
         if st.button("Select All", key="trace_sel_all", width="stretch"):
-            st.session_state.trace_selected_indices = all_display_indices
-            st.rerun()
+            st.session_state["_trace_select_all_pending"] = True
+            st.rerun(scope="fragment")
         if st.button("Clear", key="trace_clear_sel", width="stretch"):
-            st.session_state.trace_selected_indices = []
-            st.rerun()
+            st.session_state["_trace_clear_pending"] = True
+            st.rerun(scope="fragment")
 
     selected_indices = [row_option_to_orig[opt] for opt in chosen_options]
     st.session_state.trace_selected_indices = selected_indices
@@ -399,7 +435,8 @@ def render_trace_eval_tab() -> None:
         with st.expander(f"Selected trace details ({len(selected_indices)})", expanded=False):
             for orig_idx in selected_indices:
                 ti = trace_inputs[orig_idx]
-                st.markdown(f"**Trace #{all_display_indices.index(orig_idx) + 1 if orig_idx in all_display_indices else orig_idx}** — `{ti.span_id or 'no span id'}`")
+                row_num = _display_orig_to_row.get(orig_idx, orig_idx)
+                st.markdown(f"**Trace #{row_num}** — `{ti.span_id or 'no span id'}`")
                 dcol1, dcol2 = st.columns(2)
                 with dcol1:
                     st.caption("User Input")
@@ -415,10 +452,8 @@ def render_trace_eval_tab() -> None:
 
     # ── Section C: Prompt Configuration ────────────────────────────────────
     st.divider()
-    st.write("### 3. Configure Prompts")
-    st.caption(
-        f"Prompt group: `{selected_fqn}`  — original system prompt auto-filled from trace data."
-    )
+    render_section_header("⚙️", "Configure Prompts",
+                          f"Group: {selected_fqn} — original system prompt auto-filled from trace data", step=3)
 
     # Auto-populate original system prompt when FQN changes and traces have a system prompt
     last_fqn = st.session_state.get("_trace_last_autofilled_fqn", "")
@@ -449,7 +484,7 @@ def render_trace_eval_tab() -> None:
         if session_enhanced:
             if st.button("Use session enhanced prompt", key="trace_use_session_enh"):
                 st.session_state.trace_enhanced_system_prompt = session_enhanced
-                st.rerun()
+                st.rerun(scope="fragment")
         else:
             st.caption("No enhanced prompt in session yet — go to the **Enhance** tab to generate one, or paste below.")
         st.session_state.trace_enhanced_system_prompt = st.text_area(
@@ -469,10 +504,11 @@ def render_trace_eval_tab() -> None:
 
     # ── Section D: Run ──────────────────────────────────────────────────────
     st.divider()
+    render_section_header("▶", "Run Evaluation", "Choose Auto Pipeline (3-step) or run the LLM judge manually", step=4)
     if not selected_indices:
         st.info("Select trace rows above, then run the pipeline or evaluation.")
 
-    st.write("#### Auto Pipeline")
+    st.markdown('<p style="font-size:0.85rem;font-weight:600;color:#1e293b;margin:0 0 4px 0;">Auto Pipeline</p>', unsafe_allow_html=True)
     st.caption(
         "Fetches recommendations for the selected trace's system prompt, applies them to produce "
         "an enhanced prompt, then runs LLM-as-judge using the **same model from the trace** to "
@@ -501,7 +537,7 @@ def render_trace_eval_tab() -> None:
         st.write("#### Enhanced Prompt")
         render_diff(pipeline_original, pipeline_enhanced, key="diff_trace_pipeline")
 
-    st.write("#### Manual Judge")
+    st.markdown('<p style="font-size:0.85rem;font-weight:600;color:#1e293b;margin:12px 0 4px 0;">Manual Judge</p>', unsafe_allow_html=True)
     st.caption("Use the prompts configured above (original + enhanced) to run the LLM judge directly.")
     if st.button(
         f"Run LLM Judge on {len(selected_indices)} selected trace(s)",
@@ -520,9 +556,27 @@ def render_trace_eval_tab() -> None:
         with st.expander("Debug: API Response", expanded=False):
             st.json(st.session_state.get("trace_llm_judge_api_debug", {}))
 
-    # ── Section F: DeepEval Metrics ─────────────────────────────────────────
+    # ── Section F: LLM Suggestions ──────────────────────────────────────────
     has_judge = bool(st.session_state.get("trace_llm_judge_result"))
 
+    st.divider()
+    st.write("### LLM Suggestions")
+    st.caption(
+        "One LLM call analyses all trace metrics, score deltas, and key differences "
+        "to produce holistic, priority-ranked suggestions for improving the enhanced prompt."
+    )
+    if not has_judge:
+        st.info("Run LLM Judge on traces first to enable suggestion generation.")
+    if st.button("Generate Suggestions", width="stretch", key="trace_gen_suggestions_btn",
+                 type="primary", disabled=not has_judge):
+        st.session_state.trace_suggestions_result = None
+        generate_overall_suggestions()
+
+    trace_suggestions = st.session_state.get("trace_suggestions_result")
+    if trace_suggestions:
+        _render_overall_suggestions(trace_suggestions)
+
+    # ── Section G: DeepEval Metrics ─────────────────────────────────────────
     st.divider()
     st.write("### DeepEval Metrics")
     st.caption("Reference-free metrics (AnswerRelevancy, GEval, PromptAlignment, PII) on every trace output. Requires LLM Judge to have been run above.")
@@ -552,21 +606,3 @@ def render_trace_eval_tab() -> None:
     trace_metrics_result = st.session_state.get("trace_deepeval_metrics_result")
     if trace_metrics_result:
         _render_deepeval_prompt_metrics(trace_metrics_result)
-
-    # ── Section G: LLM Suggestions ──────────────────────────────────────────
-    st.divider()
-    st.write("### LLM Suggestions")
-    st.caption(
-        "One LLM call analyses all trace metrics, score deltas, and key differences "
-        "to produce holistic, priority-ranked suggestions for improving the enhanced prompt."
-    )
-    if not has_judge:
-        st.info("Run LLM Judge on traces first to enable suggestion generation.")
-    if st.button("Generate Suggestions", width="stretch", key="trace_gen_suggestions_btn",
-                 type="primary", disabled=not has_judge):
-        st.session_state.trace_suggestions_result = None
-        generate_overall_suggestions()
-
-    trace_suggestions = st.session_state.get("trace_suggestions_result")
-    if trace_suggestions:
-        _render_overall_suggestions(trace_suggestions)

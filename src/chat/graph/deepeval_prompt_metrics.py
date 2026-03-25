@@ -9,19 +9,14 @@ test cases and outputs — mirroring DeepEval's internal evaluate() architecture
 from __future__ import annotations
 
 import asyncio
+import time
+import traceback
 from typing import Any
+
+from src.common.service.logging.logger import error, info
 
 _MAX_CONCURRENT = 5  # concurrent metric.a_measure() calls
 
-
-def _safe_measure_sync(metric, test_case) -> tuple[float | None, str]:
-    try:
-        metric.measure(test_case, _show_indicator=False)
-        score = getattr(metric, "score", None)
-        reason = getattr(metric, "reason", "") or ""
-        return float(score) if score is not None else None, reason
-    except Exception as e:
-        return None, f"Error: {e}"
 
 
 async def _safe_measure_async(metric, test_case, sem: asyncio.Semaphore) -> tuple[float | None, str]:
@@ -32,6 +27,7 @@ async def _safe_measure_async(metric, test_case, sem: asyncio.Semaphore) -> tupl
             reason = getattr(metric, "reason", "") or ""
             return float(score) if score is not None else None, reason
         except Exception as e:
+            error(f"[DeepEvalMetrics] _safe_measure_async failed | metric={type(metric).__name__} | {type(e).__name__}: {e}")
             return None, f"Error: {e}"
 
 
@@ -100,23 +96,26 @@ def run_deepeval_prompt_metrics(
 
     metrics = _build_metrics(llm, geval_criteria, prompt_instructions)
     metrics_run = [key for key, _ in metrics]
+    info(f"[DeepEvalMetrics] Starting | metrics={metrics_run} | total_cases={len(test_cases)} | concurrency={_MAX_CONCURRENT}")
 
     valid_cases = [
         tc for tc in test_cases
         if tc.get("input") and tc.get("original_output") and tc.get("enhanced_output")
     ]
+    info(f"[DeepEvalMetrics] Valid cases={len(valid_cases)} (skipped {len(test_cases) - len(valid_cases)} incomplete)")
 
     async def _run_all() -> list[dict]:
         sem = asyncio.Semaphore(_MAX_CONCURRENT)
         results: list[dict] = []
 
         # Build all tasks: for each test case, measure every metric on orig and enh output
-        for tc in valid_cases:
+        for idx, tc in enumerate(valid_cases):
             inp = tc["input"]
+            info(f"[DeepEvalMetrics] Evaluating case {idx+1}/{len(valid_cases)} | input_len={len(inp)}")
+            t_case = time.time()
             orig_tc = LLMTestCase(input=inp, actual_output=tc["original_output"])
             enh_tc = LLMTestCase(input=inp, actual_output=tc["enhanced_output"])
 
-            # Schedule all metric × output combos concurrently
             orig_tasks = [_safe_measure_async(metric, orig_tc, sem) for _, metric in metrics]
             enh_tasks = [_safe_measure_async(metric, enh_tc, sem) for _, metric in metrics]
 
@@ -133,19 +132,22 @@ def run_deepeval_prompt_metrics(
                     "original_reason": o_reason,
                     "enhanced_reason": e_reason,
                 }
+                info(f"[DeepEvalMetrics] case={idx+1} | metric={key} | orig={o_score} | enh={e_score}")
             results.append({"input": inp, "scores": scores})
+            info(f"[DeepEvalMetrics] case={idx+1} done | elapsed={round(time.time()-t_case,2)}s")
 
         return results
 
+    t_start = time.time()
     try:
         loop = asyncio.get_event_loop()
         if loop.is_running():
-            # Already inside an event loop (e.g. Jupyter/Streamlit with async runner)
             import nest_asyncio
             nest_asyncio.apply()
         per_test = loop.run_until_complete(_run_all())
     except RuntimeError:
         per_test = asyncio.run(_run_all())
+    info(f"[DeepEvalMetrics] All cases done | elapsed={round(time.time()-t_start,2)}s")
 
     # Aggregate summaries
     summary: dict[str, dict] = {}

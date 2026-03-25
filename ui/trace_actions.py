@@ -95,17 +95,31 @@ def load_trace_inputs(
             st.error(f"Failed to load traces: {exc}")
 
 
-def fetch_live_trace_inputs(hours: int = 24, limit: int = 200, fqn_filter: str | None = None) -> None:
-    """Fetch live ChatCompletion spans from TrueFoundry using trace/.env credentials.
+def fetch_live_trace_inputs(
+    hours: int = 24,
+    limit: int = 200,
+    fqn_filter: str | None = None,
+    tfy_host: str = "",
+    tfy_api_key: str = "",
+) -> None:
+    """Fetch live ChatCompletion spans from TrueFoundry.
 
     Args:
         hours: How many hours back to fetch (default 24).
         limit: Max spans to fetch — caps SDK pagination for fast response (default 200).
         fqn_filter: Optional prompt FQN substring to filter client-side.
+        tfy_host: TrueFoundry tenant base URL (overrides trace/.env).
+        tfy_api_key: TrueFoundry API key (overrides trace/.env).
     """
     with st.spinner(f"Fetching live traces (last {hours // 24}d, max {limit} spans)..."):
         try:
-            spans = fetch_live_spans(hours=hours, limit=limit, prompt_fqn_filter=fqn_filter or None)
+            spans = fetch_live_spans(
+                hours=hours,
+                limit=limit,
+                prompt_fqn_filter=fqn_filter or None,
+                tfy_host=tfy_host or None,
+                tfy_api_key=tfy_api_key or None,
+            )
             if not spans:
                 st.warning("No ChatCompletion spans found in the given time range.")
                 st.session_state.trace_inputs = []
