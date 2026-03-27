@@ -280,6 +280,18 @@ def render_trace_eval_tab() -> None:
             placeholder="e.g. prompt-registry/...",
             key="trace_live_fqn",
         )
+        col_email, col_dest = st.columns(2)
+        live_email = col_email.text_input(
+            "Email filter (optional)",
+            placeholder="e.g. user@example.com",
+            key="trace_live_email",
+        )
+        live_dest = col_dest.text_input(
+            "Data routing destination",
+            value="default",
+            placeholder="default",
+            key="trace_live_dest",
+        )
     elif source_label == "Upload file":
         uploaded_file = st.file_uploader(
             "Upload traces JSON",
@@ -309,6 +321,8 @@ def render_trace_eval_tab() -> None:
                 fqn_filter=st.session_state.get("trace_live_fqn", "").strip() or None,
                 tfy_host=st.session_state.get("trace_tfy_host", "").strip(),
                 tfy_api_key=st.session_state.get("trace_tfy_api_key", "").strip(),
+                email_filter=st.session_state.get("trace_live_email", "").strip() or None,
+                data_routing_destination=st.session_state.get("trace_live_dest", "default").strip() or "default",
             )
         else:
             load_trace_inputs(

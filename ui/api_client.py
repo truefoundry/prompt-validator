@@ -37,6 +37,8 @@ def post_traces_fetch(
     hours: int = 24,
     limit: int = 200,
     fqn_filter: str | None = None,
+    email_filter: str | None = None,
+    data_routing_destination: str = "default",
 ) -> dict[str, Any]:
     """POST /traces/fetch — fetch live spans from a TrueFoundry tenant via the backend."""
     base_url = st.session_state.base_url.strip().rstrip("/")
@@ -46,9 +48,12 @@ def post_traces_fetch(
         "tfy_api_key": tfy_api_key,
         "hours": hours,
         "limit": limit,
+        "data_routing_destination": data_routing_destination,
     }
     if fqn_filter:
         payload["fqn_filter"] = fqn_filter
+    if email_filter:
+        payload["email_filter"] = email_filter
 
     def _on_retry(attempt: int, max_attempts: int, exc: BaseException) -> None:
         logger.warning("post_traces_fetch retry %d/%d: %s", attempt, max_attempts, exc)

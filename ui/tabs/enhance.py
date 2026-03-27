@@ -103,6 +103,7 @@ def _apply_suggestions(
     promote_to: str | None = None,
     promote_area_to: str | None = None,
     result_area_key: str | None = None,
+    also_update_session_key: str | None = None,
     source_error_msg: str = "No prompt found.",
 ) -> None:
     """Apply selected suggestions via the validation API and store the refined prompt."""
@@ -139,6 +140,8 @@ def _apply_suggestions(
                 st.session_state[result_key] = refined
                 if result_area_key:
                     st.session_state[f"_pending_{result_area_key}"] = refined
+                if also_update_session_key:
+                    st.session_state[also_update_session_key] = refined
                 for key in clear_keys:
                     st.session_state[key] = None
                 st.success(success_msg)
@@ -169,12 +172,13 @@ def _apply_suggestions_to_enhance_prompt(suggestions: list[str]) -> None:
         suggestions,
         source_key="enhance_eval_enh_prompt",
         result_key="enhance_eval_enh_prompt",
-        clear_keys=["enhance_eval_judge_result", "enhance_eval_suggestions_result"],
+        clear_keys=["enhance_eval_judge_result", "enhance_eval_suggestions_result", "arena_eval_result"],
         spinner_msg="Applying suggestions to generate refined enhanced prompt...",
         success_msg="Refined prompt applied. Previous enhanced is now original. Run evaluation again to measure improvement.",
         promote_to="enhance_eval_orig_prompt",
         promote_area_to="enhance_eval_orig_area",
         result_area_key="enhance_eval_enh_area",
+        also_update_session_key="enhanced_prompt",
         source_error_msg="No enhanced prompt found — run LLM Judge evaluation first.",
     )
 
@@ -190,10 +194,14 @@ def render_enhance_tab() -> None:
     # Must run BEFORE the corresponding st.text_area widgets are instantiated;
     # Streamlit raises StreamlitAPIException if a widget-bound key is mutated
     # after the widget has been created in the same script run.
+    # Track which area keys were just flushed so the auto-sync below doesn't
+    # overwrite them with a (potentially stale) top-level session value.
+    _just_flushed: set[str] = set()
     for _area_key in ("enhance_eval_orig_area", "enhance_eval_enh_area"):
         _pk = f"_pending_{_area_key}"
         if _pk in st.session_state:
             st.session_state[_area_key] = st.session_state.pop(_pk)
+            _just_flushed.add(_area_key)
 
     st.markdown(
         """<div style="margin-bottom:20px;">
@@ -263,13 +271,15 @@ def render_enhance_tab() -> None:
     render_section_header("⚖️", "Evaluate Original vs Enhanced",
                           "Enter both prompts, add test inputs, then run the LLM judge to compare quality", step=3)
 
-    # Auto-populate from session whenever the source prompt changes
+    # Auto-populate from session whenever the source prompt changes.
+    # Skip any area that was just set by the pending flush above — pending flush
+    # always has the more up-to-date iteration value.
     orig = st.session_state.get("original_prompt", "")
     enh = st.session_state.get("enhanced_prompt", "")
-    if orig and orig != st.session_state.get("_last_synced_orig_prompt"):
+    if orig and orig != st.session_state.get("_last_synced_orig_prompt") and "enhance_eval_orig_area" not in _just_flushed:
         st.session_state.enhance_eval_orig_area = orig
         st.session_state["_last_synced_orig_prompt"] = orig
-    if enh and enh != st.session_state.get("_last_synced_enh_prompt"):
+    if enh and enh != st.session_state.get("_last_synced_enh_prompt") and "enhance_eval_enh_area" not in _just_flushed:
         st.session_state.enhance_eval_enh_area = enh
         st.session_state["_last_synced_enh_prompt"] = enh
 

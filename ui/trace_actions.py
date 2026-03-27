@@ -101,6 +101,8 @@ def fetch_live_trace_inputs(
     fqn_filter: str | None = None,
     tfy_host: str = "",
     tfy_api_key: str = "",
+    email_filter: str | None = None,
+    data_routing_destination: str = "default",
 ) -> None:
     """Fetch live ChatCompletion spans via the backend /traces/fetch endpoint."""
     with st.spinner(f"Fetching live traces (last {hours // 24}d, max {limit} spans)..."):
@@ -111,13 +113,22 @@ def fetch_live_trace_inputs(
                 hours=hours,
                 limit=limit,
                 fqn_filter=fqn_filter or None,
+                email_filter=email_filter,
+                data_routing_destination=data_routing_destination,
             )
             trace_records = data.get("traces", [])
             total_spans = data.get("total_spans", 0)
             skip_reasons = data.get("skip_reasons", {})
 
             if not trace_records:
-                st.warning("No ChatCompletion spans found in the given time range.")
+                if total_spans == 0:
+                    st.warning("No ChatCompletion spans found in the given time range.")
+                else:
+                    skip_summary = ", ".join(f"{k}: {v}" for k, v in skip_reasons.items()) if skip_reasons else "unknown"
+                    st.warning(
+                        f"Fetched {total_spans} spans but none passed parsing filters.  \n"
+                        f"Skip reasons: {skip_summary}"
+                    )
                 st.session_state.trace_inputs = []
                 st.session_state.trace_selected_indices = []
                 return

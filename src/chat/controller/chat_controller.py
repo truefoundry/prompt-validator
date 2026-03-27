@@ -21,6 +21,8 @@ class FetchTracesRequest(BaseModel):
     hours: int = 24
     limit: int = 200
     fqn_filter: Optional[str] = None
+    email_filter: Optional[str] = None
+    data_routing_destination: str = "default"
 
 
 class TraceRecord(BaseModel):
@@ -104,11 +106,16 @@ async def fetch_traces(request: FetchTracesRequest) -> FetchTracesResponse:
             prompt_fqn_filter=request.fqn_filter or None,
             tfy_host=request.tfy_host,
             tfy_api_key=request.tfy_api_key,
+            email_filter=request.email_filter or None,
+            data_routing_destination=request.data_routing_destination,
         )
         inputs = parse_spans_to_inputs(spans)
         skip_reasons = getattr(parse_spans_to_inputs, "skip_reasons", {})
         elapsed = round(time.time() - t0, 2)
-        info(f"[TRACES] Fetched {len(inputs)} traces from {len(spans)} spans | elapsed={elapsed}s")
+        info(
+            f"[TRACES] Fetched {len(inputs)} traces from {len(spans)} spans | elapsed={elapsed}s"
+            + (f" | skip_reasons={skip_reasons}" if skip_reasons else "")
+        )
         return FetchTracesResponse(
             status_code=SUCCESS_STATUS_CODE,
             status_description=SUCCESS_STATUS_DESCRIPTION,

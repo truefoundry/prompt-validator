@@ -41,6 +41,8 @@ def fetch_live_spans(
     limit: int = 200,
     tfy_host: str | None = None,
     tfy_api_key: str | None = None,
+    data_routing_destination: str = "default",
+    email_filter: str | None = None,
 ) -> list[dict]:
     """Fetch spans from TFY.
 
@@ -53,6 +55,8 @@ def fetch_live_spans(
                returns quickly instead of exhausting all pages.
         tfy_host: TrueFoundry tenant base URL. If None, falls back to trace/.env / env vars.
         tfy_api_key: TrueFoundry API key. If None, falls back to trace/.env / env vars.
+        data_routing_destination: TFY data routing destination (default: "default").
+        email_filter: Filter spans by creator email via createdBySubjectSlug.
 
     Note: FQN filtering is done client-side after fetching because the TFY API
     does not reliably support string operators on tfy.prompt_version_fqn.
@@ -88,7 +92,9 @@ def fetch_live_spans(
     logger.info(
         f"[TRACE_FETCH] start={start_time.strftime('%Y-%m-%dT%H:%M:%SZ')} "
         f"end={end_time.strftime('%Y-%m-%dT%H:%M:%SZ')} "
-        f"fqn_filter={prompt_fqn_filter or 'none'}"
+        f"fqn_filter={prompt_fqn_filter or 'none'} "
+        f"email_filter={email_filter or 'none'} "
+        f"destination={data_routing_destination}"
     )
 
     filters = [
@@ -107,14 +113,26 @@ def fetch_live_spans(
             )
         )
 
-    raw_spans = tfy_client.traces.query_spans(
-        data_routing_destination="default",
+    new_filters = []
+    if email_filter:
+        new_filters.append({
+            "spanFieldName": "createdBySubjectSlug",
+            "operator": "IN",
+            "value": [email_filter],
+        })
+
+    query_kwargs: dict = dict(
+        data_routing_destination=data_routing_destination,
         start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         filters=filters,
         sort_direction="desc",
         limit=limit,
     )
+    if new_filters:
+        query_kwargs["new_filters"] = new_filters
+
+    raw_spans = tfy_client.traces.query_spans(**query_kwargs)
     spans = [span.model_dump() for span in raw_spans]
     logger.info(f"[TRACE_FETCH] Raw spans returned: {len(spans)}")
 
