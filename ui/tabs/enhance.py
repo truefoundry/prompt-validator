@@ -9,6 +9,13 @@ from ..actions import apply_recommendations, run_enhance_evaluation, generate_en
 from ..api_client import post_chat
 from ..extractors import extract_enhanced_prompt, extract_test_evaluation_result
 from ..components import render_diff, render_prompt_html, render_section_header, render_selected_recommendations_editor
+
+def _load_global_css() -> str:
+    css_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "style.css")
+    with open(css_path) as f:
+        return f"<style>{f.read()}</style>"
+
+_FRAGMENT_CSS = _load_global_css()
 from src.chat.graph.llm_judge_evaluator import (
     AVAILABLE_METRICS as _METRIC_DESCRIPTIONS,
     DEFAULT_METRICS,
@@ -94,6 +101,8 @@ def _apply_suggestions(
     spinner_msg: str,
     success_msg: str,
     promote_to: str | None = None,
+    promote_area_to: str | None = None,
+    result_area_key: str | None = None,
     source_error_msg: str = "No prompt found.",
 ) -> None:
     """Apply selected suggestions via the validation API and store the refined prompt."""
@@ -104,6 +113,12 @@ def _apply_suggestions(
 
     if promote_to:
         st.session_state[promote_to] = source_prompt
+    # Don't write promote_area_to / result_area_key directly here — those keys are
+    # bound to already-rendered st.text_area widgets and Streamlit forbids mutating
+    # them after instantiation.  Instead, stage the values under _pending_* keys and
+    # flush them at the top of render_enhance_tab() before any widgets are created.
+    if promote_area_to:
+        st.session_state[f"_pending_{promote_area_to}"] = source_prompt
 
     reasoning = st.session_state.reasoning_effort
     payload = {
@@ -122,6 +137,8 @@ def _apply_suggestions(
             refined = extract_enhanced_prompt(data)
             if refined:
                 st.session_state[result_key] = refined
+                if result_area_key:
+                    st.session_state[f"_pending_{result_area_key}"] = refined
                 for key in clear_keys:
                     st.session_state[key] = None
                 st.success(success_msg)
@@ -150,16 +167,34 @@ def _apply_suggestions_to_trace_prompt(suggestions: list[str]) -> None:
 def _apply_suggestions_to_enhance_prompt(suggestions: list[str]) -> None:
     _apply_suggestions(
         suggestions,
-        source_key="enhance_eval_orig_prompt",
+        source_key="enhance_eval_enh_prompt",
         result_key="enhance_eval_enh_prompt",
         clear_keys=["enhance_eval_judge_result", "enhance_eval_suggestions_result"],
         spinner_msg="Applying suggestions to generate refined enhanced prompt...",
-        success_msg="Refined prompt applied to Enhanced Prompt field. Run evaluation again to measure improvement.",
+        success_msg="Refined prompt applied. Previous enhanced is now original. Run evaluation again to measure improvement.",
+        promote_to="enhance_eval_orig_prompt",
+        promote_area_to="enhance_eval_orig_area",
+        result_area_key="enhance_eval_enh_area",
+        source_error_msg="No enhanced prompt found — run LLM Judge evaluation first.",
     )
 
 
 @st.fragment
 def render_enhance_tab() -> None:
+    # Re-inject global CSS on every fragment rerun so pt-section-header and
+    # other style.css classes don't disappear when a button/radio triggers
+    # a fragment-scoped re-render.
+    st.markdown(_FRAGMENT_CSS, unsafe_allow_html=True)
+
+    # Flush any pending text-area values staged by _apply_suggestions.
+    # Must run BEFORE the corresponding st.text_area widgets are instantiated;
+    # Streamlit raises StreamlitAPIException if a widget-bound key is mutated
+    # after the widget has been created in the same script run.
+    for _area_key in ("enhance_eval_orig_area", "enhance_eval_enh_area"):
+        _pk = f"_pending_{_area_key}"
+        if _pk in st.session_state:
+            st.session_state[_area_key] = st.session_state.pop(_pk)
+
     st.markdown(
         """<div style="margin-bottom:20px;">
   <h2 style="margin:0 0 4px 0;font-size:1.3rem;font-weight:700;color:#1e293b;">
@@ -184,13 +219,13 @@ def render_enhance_tab() -> None:
     render_section_header("✏️", "Edit & Apply Recommendations", "Review and tweak the recommendations, then apply", step=2)
     render_selected_recommendations_editor()
 
-    st.button(
+    if st.button(
         "⚡ Apply Recommendations & Enhance",
         width="stretch",
         type="primary",
         key="apply_recs_enhance_btn",
-        on_click=apply_recommendations,
-    )
+    ):
+        apply_recommendations()
 
     st.divider()
 
@@ -228,21 +263,35 @@ def render_enhance_tab() -> None:
     render_section_header("⚖️", "Evaluate Original vs Enhanced",
                           "Enter both prompts, add test inputs, then run the LLM judge to compare quality", step=3)
 
-    # Auto-populate from session when the text area hasn't been manually edited yet
-    if st.session_state.get("original_prompt") and not st.session_state.get("enhance_eval_orig_area"):
-        st.session_state.enhance_eval_orig_area = st.session_state.original_prompt
-    if st.session_state.get("enhanced_prompt") and not st.session_state.get("enhance_eval_enh_area"):
-        st.session_state.enhance_eval_enh_area = st.session_state.enhanced_prompt
+    # Auto-populate from session whenever the source prompt changes
+    orig = st.session_state.get("original_prompt", "")
+    enh = st.session_state.get("enhanced_prompt", "")
+    if orig and orig != st.session_state.get("_last_synced_orig_prompt"):
+        st.session_state.enhance_eval_orig_area = orig
+        st.session_state["_last_synced_orig_prompt"] = orig
+    if enh and enh != st.session_state.get("_last_synced_enh_prompt"):
+        st.session_state.enhance_eval_enh_area = enh
+        st.session_state["_last_synced_enh_prompt"] = enh
 
+    # After suggestion iterations, the rolled-forward prompts live in
+    # enhance_eval_orig/enh_prompt.  Prefer those over the top-level
+    # original_prompt / enhanced_prompt so the buttons always reflect the
+    # current iteration state, not the stale first-run values.
     col_btn_orig, col_btn_enh = st.columns(2)
     with col_btn_orig:
         if st.button("Use session original prompt", key="eval_use_orig_btn", width="stretch"):
-            val = st.session_state.get("original_prompt", "")
+            val = (
+                st.session_state.get("enhance_eval_orig_prompt", "").strip()
+                or st.session_state.get("original_prompt", "")
+            )
             st.session_state.enhance_eval_orig_prompt = val
             st.session_state.enhance_eval_orig_area = val
     with col_btn_enh:
         if st.button("Use session enhanced prompt", key="eval_use_enh_btn", width="stretch"):
-            val = st.session_state.get("enhanced_prompt", "")
+            val = (
+                st.session_state.get("enhance_eval_enh_prompt", "").strip()
+                or st.session_state.get("enhanced_prompt", "")
+            )
             st.session_state.enhance_eval_enh_prompt = val
             st.session_state.enhance_eval_enh_area = val
 
@@ -356,7 +405,6 @@ def render_enhance_tab() -> None:
         ("Conversational", [
             ("answer_relevance",             "Answer Relevance"),
             ("prompt_instruction_adherence", "Prompt Instruction Adherence"),
-            ("empathy_tone",                 "Empathy & Tone"),
         ]),
     ]
     _default_metrics_set = set(DEFAULT_METRICS)
@@ -522,12 +570,31 @@ def render_enhance_tab() -> None:
 
             scores = tr.get("scores", {})
             improved_flag = scores.get("improved", False)
+            _orig_overall = scores.get("original", {}).get("overall")
+            _enh_overall = scores.get("enhanced", {}).get("overall")
+            # Derive outcome from actual scores so tied-at-high (e.g. both 1.0)
+            # doesn't show ❌.  Resolution: improved > tied >= regressed.
+            _TIED_THRESHOLD = 0.005  # scores within 0.005 are considered tied
+            if _orig_overall is not None and _enh_overall is not None:
+                _score_delta = _enh_overall - _orig_overall
+                if _score_delta > _TIED_THRESHOLD:
+                    _outcome = "improved"
+                elif _score_delta >= -_TIED_THRESHOLD:
+                    _outcome = "tied"
+                else:
+                    _outcome = "regressed"
+            else:
+                # Fall back to LLM boolean when scores are unavailable
+                _outcome = "improved" if improved_flag else "tied"
+
             if "error" in scores:
                 tc_badge = "⚠️"
             elif tr.get("original_output", "").strip() == tr.get("enhanced_output", "").strip():
                 tc_badge = "🟰"
-            elif improved_flag:
+            elif _outcome == "improved":
                 tc_badge = "✅"
+            elif _outcome == "tied":
+                tc_badge = "🟰"
             else:
                 tc_badge = "❌"
 
@@ -547,10 +614,12 @@ def render_enhance_tab() -> None:
                     identical = orig_out.strip() == enh_out.strip()
                     if identical:
                         verdict = "🟰 Identical outputs"
-                    elif improved_flag:
+                    elif _outcome == "improved":
                         verdict = "✅ Improved"
+                    elif _outcome == "tied":
+                        verdict = "🟰 Maintained"
                     else:
-                        verdict = "❌ Not improved"
+                        verdict = "❌ Regressed"
                     st.markdown(f"{verdict} — {summary_text}")
                     diffs = scores.get("key_differences", [])
                     if diffs:
@@ -560,8 +629,8 @@ def render_enhance_tab() -> None:
 
                 orig_score = scores.get("original", {}).get("overall")
                 enh_score = scores.get("enhanced", {}).get("overall")
-                orig_label = "Original Output" + (f"  —  overall {orig_score:.2f}" if orig_score is not None else "")
-                enh_label = "Enhanced Output" + (f"  —  overall {enh_score:.2f}" if enh_score is not None else "")
+                orig_label = f"Original Output  ({_orig_model})" + (f"  —  overall {orig_score:.2f}" if orig_score is not None else "")
+                enh_label = f"Enhanced Output  ({_enh_model_used})" + (f"  —  overall {enh_score:.2f}" if enh_score is not None else "")
                 col_orig_out, col_enh_out = st.columns(2)
                 with col_orig_out:
                     with st.expander(orig_label, expanded=False):

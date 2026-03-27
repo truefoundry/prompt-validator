@@ -14,9 +14,9 @@ parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
-from trace.trace_parser import TraceInput, fetch_live_spans, load_spans_from_file, parse_spans_to_inputs
+from trace.trace_parser import TraceInput, load_spans_from_file, parse_spans_to_inputs
 
-from .api_client import post_chat
+from .api_client import post_chat, post_traces_fetch
 from .extractors import extract_enhanced_prompt, extract_recommendations, extract_test_evaluation_result
 
 
@@ -102,49 +102,34 @@ def fetch_live_trace_inputs(
     tfy_host: str = "",
     tfy_api_key: str = "",
 ) -> None:
-    """Fetch live ChatCompletion spans from TrueFoundry.
-
-    Args:
-        hours: How many hours back to fetch (default 24).
-        limit: Max spans to fetch — caps SDK pagination for fast response (default 200).
-        fqn_filter: Optional prompt FQN substring to filter client-side.
-        tfy_host: TrueFoundry tenant base URL (overrides trace/.env).
-        tfy_api_key: TrueFoundry API key (overrides trace/.env).
-    """
+    """Fetch live ChatCompletion spans via the backend /traces/fetch endpoint."""
     with st.spinner(f"Fetching live traces (last {hours // 24}d, max {limit} spans)..."):
         try:
-            spans = fetch_live_spans(
+            data = post_traces_fetch(
+                tfy_host=tfy_host,
+                tfy_api_key=tfy_api_key,
                 hours=hours,
                 limit=limit,
-                prompt_fqn_filter=fqn_filter or None,
-                tfy_host=tfy_host or None,
-                tfy_api_key=tfy_api_key or None,
+                fqn_filter=fqn_filter or None,
             )
-            if not spans:
+            trace_records = data.get("traces", [])
+            total_spans = data.get("total_spans", 0)
+            skip_reasons = data.get("skip_reasons", {})
+
+            if not trace_records:
                 st.warning("No ChatCompletion spans found in the given time range.")
                 st.session_state.trace_inputs = []
                 st.session_state.trace_selected_indices = []
                 return
 
-            inputs = parse_spans_to_inputs(spans)
-            if not inputs:
-                skip_reasons = getattr(parse_spans_to_inputs, "skip_reasons", {})
-                st.warning(
-                    f"Fetched {len(spans)} span(s) but none passed parsing. "
-                    f"Skip reasons: {skip_reasons or 'unknown'}"
-                )
-                st.session_state.trace_inputs = []
-                st.session_state.trace_selected_indices = []
-                return
-
+            inputs = [TraceInput(**rec) for rec in trace_records]
             fqns = sorted({ti.prompt_fqn for ti in inputs if ti.prompt_fqn})
             st.session_state.trace_inputs = inputs
             st.session_state.trace_selected_indices = []
-            skip_reasons = getattr(parse_spans_to_inputs, "skip_reasons", {})
-            skipped = len(spans) - len(inputs)
+            skipped = total_spans - len(inputs)
             skip_note = f"  ({skipped} skipped: {skip_reasons})" if skipped else ""
             st.success(
-                f"Fetched {len(inputs)} traces from {len(spans)} spans  |  "
+                f"Fetched {len(inputs)} traces from {total_spans} spans  |  "
                 f"{len(fqns)} prompt FQN(s) found.{skip_note}"
             )
         except Exception as exc:

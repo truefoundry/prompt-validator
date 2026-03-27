@@ -46,6 +46,9 @@ def run_enhance_evaluation() -> None:
         "judgeMetrics": st.session_state.get("enhance_eval_selected_metrics"),
     }
 
+    # Clear previous results before running so stale outputs are never shown
+    st.session_state.enhance_eval_judge_result = None
+
     with st.spinner("Running LLM-as-judge evaluation..."):
         try:
             data = post_chat(payload, include_grid_header=True)

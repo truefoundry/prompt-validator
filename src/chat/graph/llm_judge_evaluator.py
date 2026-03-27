@@ -4,33 +4,182 @@ import asyncio
 import json
 
 from src.chat.graph.base_evaluator import PromptEvaluator
+from src.chat.utils.llm_models import build_judge_schema
 from src.common.service.llm_prompt.prompt_service import PromptService
 from src.common.service.logging.logger import info
 
 # ── Metric catalogue ─────────────────────────────────────────────────────────
 
+# Short description used in the UI tooltip / metric picker
 AVAILABLE_METRICS: dict[str, str] = {
     # General quality (default)
-    "clarity":                    "How clear, well-structured, and easy to understand is the response?",
-    "completeness":               "How thoroughly does it address the user's request?",
-    "accuracy":                   "How factually correct and relevant is the content? For subjective tasks, evaluate internal consistency and relevance.",
-    "conciseness":                "Is it appropriately concise without losing important detail?",
-    "professional_tone":          "How professional and contextually appropriate is the tone?",
+    "clarity":                      "How clear, well-structured, and easy to understand is the response?",
+    "completeness":                  "How thoroughly does it address every aspect of the user's request?",
+    "accuracy":                      "How factually correct and internally consistent is the content?",
+    "conciseness":                   "Is it appropriately concise — no padding — without losing important detail?",
+    "professional_tone":             "How professional and contextually appropriate is the tone?",
     # Guardrails / Classification
-    "output_format_compliance":   "Does the response strictly follow the required output format or schema?",
-    "hallucination_avoidance":    "Did it avoid making up facts, policies, or services that do not exist?",
+    "output_format_compliance":      "Does the response strictly follow the required output format or schema?",
+    "hallucination_avoidance":       "Did it avoid fabricating facts, policies, names, or services?",
     # Conversational
-    "answer_relevance":           "Is the response directly relevant to what the user asked?",
-    "prompt_instruction_adherence": "Did the model follow all rules and instructions stated in the system prompt?",
-    "empathy_tone":               "Is the tone appropriately empathetic and contextually fitting for the user's situation?",
+    "answer_relevance":              "Is the response directly and fully relevant to what the user asked?",
+    "prompt_instruction_adherence":  "Did the model follow every rule and instruction in the system prompt?",
+}
+
+# Detailed per-metric scoring guide used inside the judge prompt
+# Each entry: description + 5-point anchor rubric
+_METRIC_GUIDE: dict[str, dict] = {
+    "clarity": {
+        "description": (
+            "Measures how clear, well-structured, and easy to read the response is. "
+            "Consider logical flow, appropriate use of formatting (bullets, headers, numbered steps), "
+            "sentence readability, and absence of ambiguous or confusing phrasing."
+        ),
+        "anchors": {
+            1.0: "Exceptionally clear. Logical structure throughout; appropriate formatting used where helpful; zero ambiguous phrasing; immediately actionable.",
+            0.75: "Mostly clear with minor structural gaps or isolated ambiguous phrasing that does not impede understanding.",
+            0.5: "Understandable but noticeably cluttered or poorly organised; reader must re-read parts to grasp the meaning.",
+            0.25: "Hard to follow. Disorganised, excessively verbose, or contains significant ambiguous language.",
+            0.0: "Incomprehensible or incoherent; so poorly structured it conveys no clear meaning.",
+        },
+    },
+    "completeness": {
+        "description": (
+            "Measures how thoroughly the response addresses the user's full request. "
+            "Every sub-question, constraint, and edge case the user raised should be covered. "
+            "Missing information that a reasonable user would expect counts against this score."
+        ),
+        "anchors": {
+            1.0: "Every aspect of the request is addressed; no gaps; all sub-questions answered; relevant edge cases acknowledged.",
+            0.75: "Fully addresses the main request but misses minor sub-points or nuances.",
+            0.5: "Addresses the core request but omits one or more notable aspects explicitly raised by the user.",
+            0.25: "Only partially answers the request; several key points missing or glossed over.",
+            0.0: "Fails to address the user's request; entirely off-topic or contains no substantive answer.",
+        },
+    },
+    "accuracy": {
+        "description": (
+            "Measures factual correctness, internal consistency, and relevance of all claims. "
+            "For subjective or creative tasks where ground truth is unavailable, evaluate whether the response "
+            "is internally consistent and free from contradictions. Do not penalise for reasonable opinions."
+        ),
+        "anchors": {
+            1.0: "All statements are factually correct and internally consistent; no unsupported or contradictory claims.",
+            0.75: "Mostly accurate with at most one minor inaccuracy or unverifiable detail that does not affect the core answer.",
+            0.5: "Generally correct but contains one notable factual error or an unsupported assertion that could mislead.",
+            0.25: "Multiple factual errors or significant internal inconsistencies that undermine the response.",
+            0.0: "Factually wrong throughout, self-contradictory, or predominantly fabricated.",
+        },
+    },
+    "conciseness": {
+        "description": (
+            "Measures whether the response is appropriately scoped — no unnecessary padding, filler phrases, "
+            "preamble, or repetition — while still including all important detail. "
+            "Penalise both excessive verbosity and responses so terse they omit necessary context."
+        ),
+        "anchors": {
+            1.0: "Perfectly scoped. Every sentence adds value; no filler words, preamble, or repetition.",
+            0.75: "Slightly verbose in places but no significant padding; core content is tight.",
+            0.5: "Noticeably padded; contains repetition or filler that should be cut, though core content is present.",
+            0.25: "Very verbose; key points buried in excessive text; would benefit from significant trimming.",
+            0.0: "Extremely bloated or repetitive to the point of obscuring the answer, or uselessly terse.",
+        },
+    },
+    "professional_tone": {
+        "description": (
+            "Measures how well the tone matches the context (formal, semi-formal, or conversational as appropriate). "
+            "Consider register consistency, absence of slang or casual language in formal contexts, "
+            "confidence of language, and politeness."
+        ),
+        "anchors": {
+            1.0: "Tone perfectly calibrated to the context; polished, confident, consistent register throughout.",
+            0.75: "Appropriate tone with minor register inconsistencies that do not distract.",
+            0.5: "Mostly appropriate but contains tonal shifts, overly casual phrasing, or mildly unprofessional language.",
+            0.25: "Noticeably inappropriate tone; casual where formal is required, or stiff and robotic in a conversational context.",
+            0.0: "Completely inappropriate tone; rude, dismissive, unprofessional, or wildly mismatched to the context.",
+        },
+    },
+    "output_format_compliance": {
+        "description": (
+            "Measures whether the response strictly follows the output format or schema specified in the system prompt "
+            "(e.g. JSON, Markdown table, numbered list, specific field names). "
+            "Use the system prompt as the ground truth for what format is required."
+        ),
+        "anchors": {
+            1.0: "Output perfectly matches the required format; all required fields present, correct types, valid structure.",
+            0.75: "Format mostly correct with one minor deviation (e.g. extra field, slight schema mismatch).",
+            0.5: "Recognisable attempt at the format but with notable deviations — missing required fields or wrong structure.",
+            0.25: "Significant format violations; partially structured but largely non-compliant.",
+            0.0: "Completely ignores the required format; returns unstructured prose or an entirely wrong schema.",
+        },
+    },
+    "hallucination_avoidance": {
+        "description": (
+            "Measures whether the response avoids fabricating facts, people, policies, product names, or services. "
+            "Every claim should be either verifiable from the user input/context or clearly flagged as uncertain. "
+            "Penalise confident assertions of unverifiable or invented details."
+        ),
+        "anchors": {
+            1.0: "Every claim is grounded; no invented facts, names, policies, or services; uncertainty is flagged appropriately.",
+            0.75: "Mostly grounded with at most one unverifiable minor claim that does not affect the core answer.",
+            0.5: "Contains one clear hallucination or fabricated detail that could mislead the user.",
+            0.25: "Multiple fabricated facts or policies presented as real.",
+            0.0: "Predominantly fabricated; invents significant facts, people, services, or events with confidence.",
+        },
+    },
+    "answer_relevance": {
+        "description": (
+            "Measures how directly and fully relevant the response is to the specific question asked. "
+            "Penalise responses that answer a related but different question, add excessive tangential information, "
+            "or fail to engage with the specific intent behind the user's input."
+        ),
+        "anchors": {
+            1.0: "Directly answers the question; every sentence is on-topic; no tangential or off-topic information.",
+            0.75: "Mostly on-topic with minor tangents or a slightly indirect answer.",
+            0.5: "Partially relevant; addresses the topic but drifts or answers a related but different question.",
+            0.25: "Loosely related to the question; mostly off-topic or answers a different question entirely.",
+            0.0: "Completely irrelevant; does not address the user's question at all.",
+        },
+    },
+    "prompt_instruction_adherence": {
+        "description": (
+            "Measures whether the model followed every explicit rule and instruction in the system prompt. "
+            "Use the system prompt as the authoritative specification. "
+            "Each violated or ignored instruction counts against this score."
+        ),
+        "anchors": {
+            1.0: "Every explicit instruction in the system prompt is followed precisely; zero rule violations.",
+            0.75: "Follows most instructions with one minor oversight or partial adherence to a rule.",
+            0.5: "Follows the main instructions but misses or partially violates one notable directive.",
+            0.25: "Violates multiple instructions or ignores a key constraint from the system prompt.",
+            0.0: "Ignores the system prompt entirely; output contradicts or disregards the given instructions.",
+        },
+    },
 }
 
 DEFAULT_METRICS: list[str] = [
     "clarity", "completeness", "accuracy", "conciseness", "professional_tone"
 ]
 
-# Ordered for display (All_METRIC_KEYS is the canonical order used by the UI)
+# Ordered for display (ALL_METRIC_KEYS is the canonical order used by the UI)
 ALL_METRIC_KEYS: list[str] = list(AVAILABLE_METRICS.keys())
+
+
+def _format_metric_block(key: str) -> str:
+    """Format a single metric as a detailed scoring block for the judge prompt."""
+    guide = _METRIC_GUIDE.get(key)
+    if not guide:
+        return f"**{key}**: {AVAILABLE_METRICS.get(key, '')}"
+
+    anchors = guide["anchors"]
+    anchor_lines = "\n".join(
+        f"  - {score:.2f}: {text}" for score, text in sorted(anchors.items(), reverse=True)
+    )
+    return (
+        f"**{key}**\n"
+        f"{guide['description']}\n"
+        f"Scoring anchors:\n{anchor_lines}"
+    )
 
 
 def build_judge_prompt(metrics: list[str]) -> str:
@@ -39,7 +188,7 @@ def build_judge_prompt(metrics: list[str]) -> str:
     if not valid:
         valid = DEFAULT_METRICS
 
-    metric_lines = "\n".join(f"- {m}: {AVAILABLE_METRICS[m]}" for m in valid)
+    metric_blocks = "\n\n".join(_format_metric_block(m) for m in valid)
     json_fields = "\n".join(f'    "{m}": 0.0,' for m in valid)
     exact_keys = ", ".join(f'"{m}"' for m in valid)
 
@@ -49,24 +198,26 @@ def build_judge_prompt(metrics: list[str]) -> str:
 - Response A generated by the original system prompt
 - Response B generated by the enhanced system prompt
 
-Your job: score both responses on the specified quality metrics and identify the key observable differences between them.
+Your job: score both responses on every specified metric and identify the key observable differences between them.
 
-### Scoring Rubric (0.0 to 1.0 scale)
-- 0.0: Fails to meet any requirements or is completely irrelevant.
-- 0.5: Meets basic requirements and is acceptable.
-- 1.0: Exceeds all expectations, providing exceptional quality and insight.
+### How to Score
+- Use the 0.0–1.0 scale. You may use any value in this range (e.g. 0.6, 0.85); do not restrict yourself to the anchor values.
+- The anchor values (1.0, 0.75, 0.5, 0.25, 0.0) are reference points — interpolate between them for intermediate quality.
+- Score each response independently against the metric definition. Do not score relative to the other response.
+- Be calibrated: a score of 0.5 means genuinely acceptable, not mediocre. Reserve 0.0 and 1.0 for truly extreme cases.
 
 ### Metrics
-Score each response on these metrics:
-{metric_lines}
+
+{metric_blocks}
 
 ### Calculation and Logic Rules
 - The 'overall' score MUST be the exact mathematical average of all metric scores. Do not provide a subjective total.
-- Use the system prompts as ground truth when evaluating metrics like output_format_compliance and prompt_instruction_adherence.
-- Fallback: If Response A and Response B are identical, assign identical scores to both and note this in 'improvement_summary'.
+- Use the system prompts as ground truth when evaluating output_format_compliance and prompt_instruction_adherence.
+- If Response A and Response B are identical, assign identical scores to both and note this in 'improvement_summary'.
+- Set "improved": true ONLY when the enhanced overall score is meaningfully higher than the original (difference > 0.05). Set "improved": false when scores are tied or the enhanced regressed. "Not improved" does not mean "bad" — a tie at high scores is a valid outcome.
 
 ### Key Differences
-Identify the most notable observable differences between Response A and Response B in terms of style, structure, content coverage, or phrasing. These are factual comparisons, not judgements.
+Identify the most notable observable differences between Response A and Response B in terms of style, structure, content coverage, or phrasing. State facts — do not editorialize.
 
 ### Output Constraints
 Return ONLY valid JSON. Do NOT include markdown code fences, conversational filler, or any text outside the JSON object.
@@ -201,6 +352,7 @@ class LLMJudgeEvaluator(PromptEvaluator):
             max_tokens=self.max_tokens,
             temperature=0.0,
             reasoning_effort=self.reasoning_effort,
+            response_schema=build_judge_schema(metrics),
         )
         try:
             cleaned = raw.strip()

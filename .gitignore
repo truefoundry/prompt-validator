@@ -8,3 +8,9 @@ src/prompt_validator.egg-info/
 *.egg-info/
 *.pyc
 trace/*.json
+ISSUES.md
+cli/
+score_prompts.py
+run_cvs_tests.py
+test.ipynb
+prompts/floqasr_prompts_eval.json

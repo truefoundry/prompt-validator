@@ -60,6 +60,56 @@ def _resolve_model_name(model_name: str | None = None) -> str:
     return "openai-main/gpt-4o"
 
 
+def get_generate_suggestions_schema() -> dict[str, Any]:
+    """JSON schema for generate_suggestions handler output."""
+    suggestion_item = {
+        "type": "object",
+        "properties": {
+            "priority": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]},
+            "title": {"type": "string"},
+            "suggestion": {"type": "string"},
+            "rationale": {"type": "string"},
+        },
+        "required": ["priority", "title", "suggestion", "rationale"],
+        "additionalProperties": False,
+    }
+    return {
+        "type": "object",
+        "properties": {
+            "overall_analysis": {"type": "string"},
+            "suggestions": {"type": "array", "items": suggestion_item},
+        },
+        "required": ["overall_analysis", "suggestions"],
+        "additionalProperties": False,
+    }
+
+
+def build_judge_schema(metrics: list[str]) -> dict[str, Any]:
+    """Build a JSON schema for the LLM judge output, dynamically including metric keys."""
+    metric_props = {m: {"type": "number"} for m in metrics}
+    metric_props["overall"] = {"type": "number"}
+    required_keys = metrics + ["overall"]
+
+    side_schema = {
+        "type": "object",
+        "properties": metric_props,
+        "required": required_keys,
+        "additionalProperties": False,
+    }
+    return {
+        "type": "object",
+        "properties": {
+            "original": side_schema,
+            "enhanced": side_schema,
+            "improved": {"type": "boolean"},
+            "improvement_summary": {"type": "string"},
+            "key_differences": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["original", "enhanced", "improved", "improvement_summary", "key_differences"],
+        "additionalProperties": False,
+    }
+
+
 def get_recommendation_response_schema() -> dict[str, Any]:
     """JSON schema for recommendation endpoint output."""
     return {

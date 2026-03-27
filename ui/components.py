@@ -24,6 +24,25 @@ def render_section_header(
         unsafe_allow_html=True,
     )
 
+_TAG_RE = re.compile(
+    r'(&lt;/?)'                     # opening < or </
+    r'([\w:.-]+)'                   # tag name
+    r'((?:\s+[\w:.-]+\s*=\s*'       # optional attributes
+    r'(?:&quot;[^&]*?&quot;|'
+    r"&apos;[^&]*?&apos;|"
+    r'&amp;\w+;|[^\s&>]*))*)'
+    r'(\s*/?&gt;)',                  # closing > or />
+    re.DOTALL,
+)
+_ATTR_RE = re.compile(
+    r'([\w:.-]+)(\s*=\s*)((?:&quot;[^&]*?&quot;|&apos;[^&]*?&apos;|[^\s&]+))'
+)
+_TPL_VAR_RE = re.compile(r'(\{\{[\w.\-\s|]+?\}\}|\{[\w.\-]+?\})')
+_MD_BOLD_RE = re.compile(r'\*\*([^*]+?)\*\*|__([^_]+?)__')
+_MD_ITALIC_RE = re.compile(r'(?<!\*)\*([^*]+?)\*(?!\*)|(?<!_)_([^_]+?)_(?!_)')
+_MD_CODE_RE = re.compile(r'`([^`]+?)`')
+_MD_BULLET_RE = re.compile(r'^(\s*(?:[-*]|\d+\.)\s)')
+
 _PROMPT_CONTAINER_CSS = """\
 <style>
 .prompt-box {
@@ -99,25 +118,6 @@ _PROMPT_CONTAINER_CSS = """\
 }
 </style>
 """
-
-_TAG_RE = re.compile(
-    r'(&lt;/?)'                     # opening < or </
-    r'([\w:.-]+)'                   # tag name
-    r'((?:\s+[\w:.-]+\s*=\s*'       # optional attributes
-    r'(?:&quot;[^&]*?&quot;|'
-    r"&apos;[^&]*?&apos;|"
-    r'&amp;\w+;|[^\s&>]*))*)'
-    r'(\s*/?&gt;)',                  # closing > or />
-    re.DOTALL,
-)
-_ATTR_RE = re.compile(
-    r'([\w:.-]+)(\s*=\s*)((?:&quot;[^&]*?&quot;|&apos;[^&]*?&apos;|[^\s&]+))'
-)
-_TPL_VAR_RE = re.compile(r'(\{\{[\w.\-\s|]+?\}\}|\{[\w.\-]+?\})')
-_MD_BOLD_RE = re.compile(r'\*\*([^*]+?)\*\*|__([^_]+?)__')
-_MD_ITALIC_RE = re.compile(r'(?<!\*)\*([^*]+?)\*(?!\*)|(?<!_)_([^_]+?)_(?!_)')
-_MD_CODE_RE = re.compile(r'`([^`]+?)`')
-_MD_BULLET_RE = re.compile(r'^(\s*(?:[-*]|\d+\.)\s)')
 
 
 def _highlight(text: str) -> str:
@@ -209,7 +209,7 @@ def render_recommendation_checkboxes() -> None:
         previous_selected = recommendation in st.session_state.selected_recommendations
         col_cb, col_text = st.columns([0.05, 0.95])
         with col_cb:
-            checked = st.checkbox("", value=previous_selected, key=key, label_visibility="collapsed")
+            checked = st.checkbox("Select", value=previous_selected, key=key, label_visibility="collapsed")
         with col_text:
             bg = "#f5f3ff" if previous_selected else "#fafafa"
             border = "#c4b5fd" if previous_selected else "#e2e8f0"

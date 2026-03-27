@@ -13,7 +13,7 @@ from truefoundry.ml import ArtifactPath
 from src.chat.models.state_model import State
 from src.chat.models.prompt_recommendation_request import PromptRecommendationRequest
 from src.chat.utils.constants import RequestType
-from src.chat.utils.llm_models import get_recommendation_response_schema
+from src.chat.utils.llm_models import get_recommendation_response_schema, get_generate_suggestions_schema
 from src.chat.utils.checkpointer_factory_util import CheckpointerFactory
 from src.common.config.app_config import get_application_config
 from src.common.util.method_stats_util import method_exec_stats
@@ -60,12 +60,15 @@ def _get_prompt_slug(state):
 
 
 def _strip_json_fences(raw: str) -> str:
-    """Strip markdown code fences from a raw LLM JSON response."""
+    """Strip markdown code fences from a raw LLM JSON response.
+
+    Uses split-on-first-newline + rsplit-on-last-fence so that triple backticks
+    inside the JSON content (e.g. in analysis text) don't corrupt the parse.
+    """
     cleaned = raw.strip()
     if cleaned.startswith("```"):
-        cleaned = cleaned.split("```")[1]
-        if cleaned.startswith("json"):
-            cleaned = cleaned[4:]
+        cleaned = cleaned.split("\n", 1)[-1]   # drop opening ```json line
+        cleaned = cleaned.rsplit("```", 1)[0]  # drop closing ```
     return cleaned.strip()
 
 
@@ -274,6 +277,7 @@ async def _handle_generate_suggestions(state, prompt_to_validate):
         max_tokens=req.get("max_tokens"),
         temperature=0.2,
         reasoning_effort=req.get("reasoning_effort"),
+        response_schema=get_generate_suggestions_schema(),
     )
     try:
         result = json.loads(_strip_json_fences(raw))

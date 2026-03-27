@@ -1,3 +1,4 @@
+import uuid
 import streamlit as st
 
 from .config import DEFAULT_BASE_URL, DEFAULT_MODEL_NAME
@@ -5,7 +6,7 @@ from .config import DEFAULT_BASE_URL, DEFAULT_MODEL_NAME
 def init_session_state() -> None:
     defaults = {
         "base_url": DEFAULT_BASE_URL,
-        "session_id": "123",
+        "session_id": str(uuid.uuid4()),
         "model_name": DEFAULT_MODEL_NAME,
         "max_tokens": 15000,
         "temperature": 0.1,

@@ -126,9 +126,9 @@ html, body, [class*="css"] {
     font-weight: 700 !important;
     text-transform: uppercase !important;
     letter-spacing: 0.07em !important;
-    color: #94a3b8 !important;
+    color: #475569 !important;
 }
-[data-testid="stMetricValue"] div { font-size: 1.55rem !important; font-weight: 700 !important; color: #1e293b !important; }
+[data-testid="stMetricValue"] div { font-size: 1.55rem !important; font-weight: 700 !important; color: #0f172a !important; }
 [data-testid="stMetricDelta"] div { font-size: 0.8rem !important; font-weight: 600 !important; }
 
 /* ── Expanders ───────────────────────────────────────────────────────────── */
@@ -237,7 +237,7 @@ html, body, [class*="css"] {
 [data-testid="stAlert"] { border-radius: 10px !important; font-size: 0.875rem !important; }
 
 /* ── Captions ────────────────────────────────────────────────────────────── */
-[data-testid="stCaptionContainer"] p { color: #64748b !important; font-size: 0.8rem !important; }
+[data-testid="stCaptionContainer"] p { color: #94a3b8 !important; font-size: 0.8rem !important; }
 
 /* ── Dividers ────────────────────────────────────────────────────────────── */
 hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 1.5rem 0 !important; }
@@ -287,7 +287,7 @@ hr { border: none !important; border-top: 1px solid #e2e8f0 !important; margin: 
 }
 [data-testid="stMain"] .stMarkdown p,
 [data-testid="stMain"] p {
-    color: #94a3b8 !important;
+    color: #cbd5e1 !important;
 }
 [data-testid="stMain"] label,
 [data-testid="stMain"] [data-testid="stWidgetLabel"] p {
