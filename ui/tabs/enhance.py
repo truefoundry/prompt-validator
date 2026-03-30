@@ -161,8 +161,7 @@ def _apply_suggestions_to_trace_prompt(suggestions: list[str]) -> None:
         result_key="trace_enhanced_system_prompt",
         clear_keys=["trace_llm_judge_result", "trace_suggestions_result", "trace_deepeval_metrics_result"],
         spinner_msg="Applying suggestions to generate refined prompt...",
-        success_msg="Refined prompt applied. Original → previous enhanced. Run the judge again to measure improvement.",
-        promote_to="trace_original_system_prompt",
+        success_msg="Refined prompt applied. Run the judge again to compare against the original.",
         source_error_msg="No enhanced prompt found — run the pipeline or judge first.",
     )
 
@@ -323,6 +322,16 @@ def render_enhance_tab() -> None:
         )
         st.session_state.enhance_eval_enh_prompt = st.session_state.get("enhance_eval_enh_area", "")
 
+    # ── Iteration Diff ───────────────────────────────────────────────────────
+    # Show diff between the two prompts currently in the evaluation boxes.
+    # After iteration 2+, these are v1 (orig box) vs v2 (enh box) — much more
+    # useful than the cumulative original→v2 diff shown in Step 2 above.
+    _iter_orig = st.session_state.get("enhance_eval_orig_prompt", "").strip()
+    _iter_enh = st.session_state.get("enhance_eval_enh_prompt", "").strip()
+    if _iter_orig and _iter_enh and _iter_orig != _iter_enh:
+        with st.expander("Diff: Previous → Current Enhanced", expanded=False):
+            render_diff(_iter_orig, _iter_enh, key="diff_enhance_iter")
+
     # ── Multiple Test Inputs ─────────────────────────────────────────────────
     render_section_header("🧩", "Test Inputs",
                           'Add test inputs manually or upload JSON — e.g. ["q1","q2"] or [{"input":"q1"}]')
@@ -451,8 +460,8 @@ def render_enhance_tab() -> None:
             enh_model_options = [""] + _MODELS
             st.selectbox("Model", enh_model_options, key="enhance_eval_enh_model_name",
                          placeholder="Same as original")
-            st.slider("Temperature", 0.0, 2.0, step=0.1, key="enhance_eval_enh_temperature")
-            st.number_input("Max Tokens", 1, 100000, step=1000, key="enhance_eval_enh_max_tokens")
+            st.slider("Temperature", 0.0, 2.0, value=0.1, step=0.1, key="enhance_eval_enh_temperature")
+            st.number_input("Max Tokens", 1, 100000, value=15000, step=1000, key="enhance_eval_enh_max_tokens")
 
             # Reasoning effort — show only if selected model supports it
             _enh_model_lower = (st.session_state.get("enhance_eval_enh_model_name") or "").lower()
@@ -519,7 +528,7 @@ def render_enhance_tab() -> None:
         # Use metrics_requested stored in the result (set at evaluation time).
         # Fall back to inferring from judge response keys only if missing.
         _NON_METRIC = {"overall", "improved", "improvement_summary", "key_differences",
-                       "prompt_recommendations", "error", "raw"}
+                       "prompt_recommendations", "error", "raw", "reasoning", "correctness_analysis"}
         first_orig = next(
             (r.get("scores", {}).get("original", {}) for r in test_results
              if "error" not in r.get("scores", {})), {}
@@ -636,6 +645,50 @@ def render_enhance_tab() -> None:
                         with st.expander("Key Differences", expanded=True):
                             for d in diffs:
                                 st.markdown(f"- {d}")
+
+                    # ── Correctness Analysis ──────────────────────────────
+                    ca = scores.get("correctness_analysis")
+                    if ca:
+                        with st.expander("Correctness Analysis", expanded=True):
+                            c_orig = ca.get("original_correctness_score")
+                            c_enh  = ca.get("enhanced_correctness_score")
+                            c_delta = (c_enh - c_orig) if (c_orig is not None and c_enh is not None) else None
+                            col_ca, col_cb, col_cc = st.columns(3)
+                            col_ca.metric("Original Correctness", f"{c_orig:.2f}" if c_orig is not None else "—")
+                            col_cb.metric("Enhanced Correctness", f"{c_enh:.2f}" if c_enh is not None else "—",
+                                          delta=f"{c_delta:+.2f}" if c_delta is not None else None)
+                            col_cc.metric("Δ Correctness", f"{c_delta:+.2f}" if c_delta is not None else "—")
+                            verdict_text = ca.get("correctness_verdict", "")
+                            if verdict_text:
+                                st.caption(verdict_text)
+                            orig_gaps = ca.get("original_gaps", [])
+                            enh_gaps  = ca.get("enhanced_gaps", [])
+                            if orig_gaps or enh_gaps:
+                                gap_col_o, gap_col_e = st.columns(2)
+                                with gap_col_o:
+                                    if orig_gaps:
+                                        st.markdown("**Original gaps:**")
+                                        for g in orig_gaps:
+                                            st.markdown(f"- {g}")
+                                with gap_col_e:
+                                    if enh_gaps:
+                                        st.markdown("**Enhanced gaps:**")
+                                        for g in enh_gaps:
+                                            st.markdown(f"- {g}")
+
+                    # ── CoT Reasoning ─────────────────────────────────────
+                    reasoning = scores.get("reasoning")
+                    if reasoning:
+                        with st.expander("CoT Reasoning", expanded=False):
+                            for rkey, rlabel in [
+                                ("task_intent", "Task Intent"),
+                                ("expected_response_profile", "Expected Response Profile"),
+                                ("response_a_correctness", "Response A Correctness"),
+                                ("response_b_correctness", "Response B Correctness"),
+                            ]:
+                                if reasoning.get(rkey):
+                                    st.markdown(f"**{rlabel}**")
+                                    st.markdown(reasoning[rkey])
 
                 orig_score = scores.get("original", {}).get("overall")
                 enh_score = scores.get("enhanced", {}).get("overall")

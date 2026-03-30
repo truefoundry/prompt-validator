@@ -1,3 +1,6 @@
+import json
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -10,10 +13,28 @@ from ..trace_actions import (
     run_trace_pipeline,
 )
 from .enhance import _render_overall_suggestions
-from src.chat.graph.llm_judge_evaluator import DEFAULT_METRICS
+from src.chat.graph.llm_judge_evaluator import DEFAULT_METRICS, ALL_METRIC_KEYS, AVAILABLE_METRICS
 
 
 _JUDGE_METRICS = DEFAULT_METRICS + ["overall"]
+
+_TRACE_METRIC_GROUPS = [
+    ("General Quality", [
+        ("clarity",           "Clarity"),
+        ("completeness",      "Completeness"),
+        ("accuracy",          "Accuracy"),
+        ("conciseness",       "Conciseness"),
+        ("professional_tone", "Professional Tone"),
+    ]),
+    ("Guardrails / Classification", [
+        ("output_format_compliance", "Output Format Compliance"),
+        ("hallucination_avoidance",  "Hallucination Avoidance"),
+    ]),
+    ("Conversational", [
+        ("answer_relevance",             "Answer Relevance"),
+        ("prompt_instruction_adherence", "Prompt Instruction Adherence"),
+    ]),
+]
 
 _METRIC_LABELS = {
     "answer_relevancy": "Answer Relevancy",
@@ -28,6 +49,18 @@ _LOWER_IS_BETTER = {"pii"}
 _INPUT_MODES = ("TFY Prompt FQN", "Paste Prompt Text")
 
 _TRACE_SOURCE_OPTIONS = ("Fetch Live Traces", "Use traces.json", "Upload file")
+
+
+def _load_models() -> list[str]:
+    try:
+        root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        with open(os.path.join(root, "models.json")) as f:
+            return sorted(json.load(f).get("models", []))
+    except Exception:
+        return []
+
+
+_MODELS = _load_models()
 
 
 
@@ -132,6 +165,22 @@ def _render_llm_judge_results(result: dict) -> None:
     summary = result.get("summary", {})
     test_results = result.get("test_results", [])
 
+    _NON_METRIC = {"overall", "improved", "improvement_summary", "key_differences",
+                   "prompt_recommendations", "error", "raw", "reasoning", "correctness_analysis"}
+
+    # Derive actual metric list from the result (respects what was selected at eval time)
+    first_orig = next(
+        (r.get("scores", {}).get("original", {}) for r in test_results
+         if "error" not in r.get("scores", {})), {}
+    )
+    metrics = (
+        result.get("metrics_requested")
+        or result.get("metrics_used")
+        or [k for k in ALL_METRIC_KEYS if k in first_orig]
+        or [k for k in first_orig if k not in _NON_METRIC]
+    )
+    all_metrics = metrics + ["overall"]
+
     # ── Aggregate metrics ──────────────────────────────────────────────────
     if summary:
         st.write("#### Aggregate Metrics")
@@ -147,7 +196,7 @@ def _render_llm_judge_results(result: dict) -> None:
         col_c.metric("Improvement Rate", f"{improved / total * 100:.0f}%" if total else "—")
 
         rows = []
-        for m in _JUDGE_METRICS:
+        for m in all_metrics:
             o = avg_orig.get(m)
             e = avg_enh.get(m)
             d = avg_delta.get(m)
@@ -157,7 +206,7 @@ def _render_llm_judge_results(result: dict) -> None:
                 "Enhanced": f"{e:.3f}" if e is not None else "—",
                 "Δ Delta": f"{d:+.3f}" if d is not None else "—",
             })
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        st.dataframe(pd.DataFrame(rows).set_index("Metric"), width="stretch")
 
     # ── Prompt recommendations (aggregated across all test cases) ───────────
     all_recs: list[str] = []
@@ -178,46 +227,162 @@ def _render_llm_judge_results(result: dict) -> None:
     if test_results:
         st.divider()
         st.write("#### Per-Test Comparison")
-        for tr in test_results:
+        _TIED_THRESHOLD = 0.005
+        for i, tr in enumerate(test_results):
             scores = tr.get("scores", {})
             orig_overall = scores.get("original", {}).get("overall")
             enh_overall = scores.get("enhanced", {}).get("overall")
             improved_flag = scores.get("improved", False)
-            badge = "✅" if improved_flag else "➖"
-            label = (
-                f"{badge} {tr.get('test_case_name', tr.get('test_case_id', '?'))}  "
-                f"| Orig: {orig_overall:.2f} → Enh: {enh_overall:.2f}"
-                if orig_overall is not None and enh_overall is not None
-                else f"{badge} {tr.get('test_case_name', tr.get('test_case_id', '?'))}"
+
+            # Score-based outcome (same logic as enhance tab)
+            if orig_overall is not None and enh_overall is not None:
+                _delta = enh_overall - orig_overall
+                if _delta > _TIED_THRESHOLD:
+                    _outcome = "improved"
+                elif _delta >= -_TIED_THRESHOLD:
+                    _outcome = "tied"
+                else:
+                    _outcome = "regressed"
+            else:
+                _outcome = "improved" if improved_flag else "tied"
+
+            if "error" in scores:
+                badge = "⚠️"
+            elif tr.get("original_output", "").strip() == tr.get("enhanced_output", "").strip():
+                badge = "🟰"
+            elif _outcome == "improved":
+                badge = "✅"
+            elif _outcome == "tied":
+                badge = "🟰"
+            else:
+                badge = "❌"
+
+            # Latency
+            orig_lat = tr.get("original_latency_s")
+            enh_lat = tr.get("enhanced_latency_s")
+            lat_parts = []
+            if orig_lat is not None:
+                lat_parts.append(f"Original: ⏱ {orig_lat}s")
+            if enh_lat is not None:
+                lat_parts.append(f"Enhanced: ⏱ {enh_lat}s")
+            lat_str = f" · {' | '.join(lat_parts)}" if lat_parts else ""
+
+            tc_name = tr.get("test_case_name", tr.get("test_case_id", f"Test {i + 1}"))
+            score_str = (
+                f" | Orig: {orig_overall:.2f} → Enh: {enh_overall:.2f}"
+                if orig_overall is not None and enh_overall is not None else ""
             )
+            label = f"{badge} {tc_name}{score_str}{lat_str}"
+
             with st.expander(label, expanded=False):
-                with st.expander("Input", expanded=False):
-                    st.text_area("Input", value=tr.get("input", ""), height=200,
-                                 disabled=True, key=f"trace_input_{tr.get('test_case_id')}",
-                                 label_visibility="collapsed")
-                col_o, col_e = st.columns(2)
-                with col_o:
-                    with st.expander("Original Output", expanded=False):
-                        st.text_area("Original Output", value=tr.get("original_output", ""), height=200,
-                                     disabled=True, key=f"trace_orig_out_{tr.get('test_case_id')}",
-                                     label_visibility="collapsed")
-                with col_e:
-                    with st.expander("Enhanced Output", expanded=False):
-                        st.text_area("Enhanced Output", value=tr.get("enhanced_output", ""), height=200,
-                                     disabled=True, key=f"trace_enh_out_{tr.get('test_case_id')}",
+                if tr.get("input"):
+                    with st.expander("Input", expanded=False):
+                        st.text_area("Input", value=tr.get("input", ""), height=200,
+                                     disabled=True, key=f"trace_input_{tr.get('test_case_id')}_{i}",
                                      label_visibility="collapsed")
 
-                if "error" not in scores:
-                    metric_rows = []
-                    for m in _JUDGE_METRICS:
-                        o = scores.get("original", {}).get(m)
-                        e = scores.get("enhanced", {}).get(m)
-                        metric_rows.append({
-                            "Metric": m.replace("_", " ").title(),
-                            "Original": f"{o:.2f}" if o is not None else "—",
-                            "Enhanced": f"{e:.2f}" if e is not None else "—",
-                        })
-                    st.dataframe(pd.DataFrame(metric_rows), hide_index=True, width="stretch")
+                if "error" in scores:
+                    st.error(f"Judge error: {scores.get('error')}")
+                else:
+                    summary_text = scores.get("improvement_summary", "")
+                    orig_out = tr.get("original_output", "")
+                    enh_out = tr.get("enhanced_output", "")
+                    identical = orig_out.strip() == enh_out.strip()
+                    if identical:
+                        verdict = "🟰 Identical outputs"
+                    elif _outcome == "improved":
+                        verdict = "✅ Improved"
+                    elif _outcome == "tied":
+                        verdict = "🟰 Maintained"
+                    else:
+                        verdict = "❌ Regressed"
+                    st.markdown(f"{verdict} — {summary_text}")
+                    diffs = scores.get("key_differences", [])
+                    if diffs:
+                        with st.expander("Key Differences", expanded=True):
+                            for d in diffs:
+                                st.markdown(f"- {d}")
+
+                    # ── Correctness Analysis ──────────────────────────────
+                    ca = scores.get("correctness_analysis")
+                    if ca:
+                        with st.expander("Correctness Analysis", expanded=True):
+                            c_orig = ca.get("original_correctness_score")
+                            c_enh  = ca.get("enhanced_correctness_score")
+                            c_delta = (c_enh - c_orig) if (c_orig is not None and c_enh is not None) else None
+                            col_ca, col_cb, col_cc = st.columns(3)
+                            col_ca.metric("Original Correctness", f"{c_orig:.2f}" if c_orig is not None else "—")
+                            col_cb.metric("Enhanced Correctness", f"{c_enh:.2f}" if c_enh is not None else "—",
+                                          delta=f"{c_delta:+.2f}" if c_delta is not None else None)
+                            col_cc.metric("Δ Correctness", f"{c_delta:+.2f}" if c_delta is not None else "—")
+                            verdict_text = ca.get("correctness_verdict", "")
+                            if verdict_text:
+                                st.caption(verdict_text)
+                            orig_gaps = ca.get("original_gaps", [])
+                            enh_gaps  = ca.get("enhanced_gaps", [])
+                            if orig_gaps or enh_gaps:
+                                gap_col_o, gap_col_e = st.columns(2)
+                                with gap_col_o:
+                                    if orig_gaps:
+                                        st.markdown("**Original gaps:**")
+                                        for g in orig_gaps:
+                                            st.markdown(f"- {g}")
+                                with gap_col_e:
+                                    if enh_gaps:
+                                        st.markdown("**Enhanced gaps:**")
+                                        for g in enh_gaps:
+                                            st.markdown(f"- {g}")
+
+                    # ── CoT Reasoning ─────────────────────────────────────
+                    reasoning = scores.get("reasoning")
+                    if reasoning:
+                        with st.expander("CoT Reasoning", expanded=False):
+                            for rkey, rlabel in [
+                                ("task_intent", "Task Intent"),
+                                ("expected_response_profile", "Expected Response Profile"),
+                                ("response_a_correctness", "Response A Correctness"),
+                                ("response_b_correctness", "Response B Correctness"),
+                            ]:
+                                if reasoning.get(rkey):
+                                    st.markdown(f"**{rlabel}**")
+                                    st.markdown(reasoning[rkey])
+
+                col_o, col_e = st.columns(2)
+                orig_score = scores.get("original", {}).get("overall")
+                enh_score = scores.get("enhanced", {}).get("overall")
+                orig_label = "Original Output" + (f"  —  overall {orig_score:.2f}" if orig_score is not None else "")
+                enh_label = "Enhanced Output" + (f"  —  overall {enh_score:.2f}" if enh_score is not None else "")
+                with col_o:
+                    with st.expander(orig_label, expanded=False):
+                        st.text_area("orig", value=tr.get("original_output", ""), height=200,
+                                     disabled=True, key=f"trace_orig_out_{tr.get('test_case_id')}_{i}",
+                                     label_visibility="collapsed")
+                with col_e:
+                    with st.expander(enh_label, expanded=False):
+                        st.text_area("enh", value=tr.get("enhanced_output", ""), height=200,
+                                     disabled=True, key=f"trace_enh_out_{tr.get('test_case_id')}_{i}",
+                                     label_visibility="collapsed")
+
+                # Per-test metric scores — use actual keys from the result
+                orig_scores_detail = scores.get("original", {})
+                enh_scores_detail = scores.get("enhanced", {})
+                if orig_scores_detail or enh_scores_detail:
+                    score_keys = [k for k in (list(orig_scores_detail.keys()) or list(enh_scores_detail.keys()))
+                                  if k not in _NON_METRIC]
+                    if score_keys:
+                        metric_rows = []
+                        for k in score_keys:
+                            ov = orig_scores_detail.get(k)
+                            ev = enh_scores_detail.get(k)
+                            delta = (ev - ov) if (ov is not None and ev is not None) else None
+                            metric_rows.append({
+                                "Metric": k.replace("_", " ").title(),
+                                "Original": f"{ov:.3f}" if ov is not None else "—",
+                                "Enhanced": f"{ev:.3f}" if ev is not None else "—",
+                                "Δ": f"{delta:+.3f}" if delta is not None else "—",
+                            })
+                        with st.expander("Metric Scores", expanded=True):
+                            st.dataframe(pd.DataFrame(metric_rows).set_index("Metric"), width="stretch")
 
                 if scores.get("improvement_summary"):
                     st.info(scores["improvement_summary"])
@@ -229,6 +394,12 @@ def _render_llm_judge_results(result: dict) -> None:
 
 @st.fragment
 def render_trace_eval_tab() -> None:
+    # Flush pending original prompt update BEFORE the text area widget is created.
+    # _apply_suggestions stages the promoted value here so the key-bound widget
+    # picks it up on the next render (Streamlit ignores value= for key-bound widgets).
+    if "_pending_trace_orig_sys_area" in st.session_state:
+        st.session_state["trace_orig_sys_area"] = st.session_state.pop("_pending_trace_orig_sys_area")
+
     st.markdown(
         """<div style="margin-bottom:20px;">
   <h2 style="margin:0 0 4px 0;font-size:1.3rem;font-weight:700;color:#1e293b;">
@@ -473,6 +644,7 @@ def render_trace_eval_tab() -> None:
     last_fqn = st.session_state.get("_trace_last_autofilled_fqn", "")
     if fqn_sys_prompt and selected_fqn != last_fqn:
         st.session_state.trace_original_system_prompt = fqn_sys_prompt
+        st.session_state["trace_orig_sys_area"] = fqn_sys_prompt
         st.session_state._trace_last_autofilled_fqn = selected_fqn
 
     col_orig, col_enh = st.columns(2)
@@ -509,12 +681,76 @@ def render_trace_eval_tab() -> None:
             label_visibility="collapsed",
         )
 
+    # ── Model Configuration override (for enhanced prompt) ───────────────────
+    with st.expander("Model Configuration", expanded=False):
+        col_orig_m, col_enh_m = st.columns(2)
+        with col_orig_m:
+            st.caption("**Original Prompt**")
+            st.info(f"Uses sidebar config — model: `{st.session_state.get('model_name') or 'default'}`")
+        with col_enh_m:
+            st.caption("**Enhanced Prompt** — override (leave blank to use same as original)")
+            enh_model_options = [""] + _MODELS
+            st.selectbox("Model", enh_model_options, key="trace_eval_enh_model_name",
+                         placeholder="Same as original")
+            st.slider("Temperature", 0.0, 2.0, value=0.1, step=0.1, key="trace_eval_enh_temperature")
+            st.number_input("Max Tokens", 1, 100000, value=15000, step=1000, key="trace_eval_enh_max_tokens")
+
+            _enh_model_lower = (st.session_state.get("trace_eval_enh_model_name") or "").lower()
+            _enh_supports = any(p in _enh_model_lower for p in (
+                "gemini-2.5", "gemini-3", "claude-opus-4", "claude-sonnet-4",
+                "claude-3-7", "o4-mini", "o4-preview", "o3-mini", "/o3", "/o1",
+                "o1-mini", "deepseek-r1", "qwen3", "grok-3-mini",
+            ))
+            if _enh_supports:
+                _enh_options = ["none", "minimal", "low", "medium", "high"] if any(
+                    p in _enh_model_lower for p in ("gemini-2.5", "gemini-3")
+                ) else ["none", "low", "medium", "high"]
+                st.selectbox("Reasoning Effort", _enh_options,
+                             key="trace_eval_enh_reasoning_effort")
+            else:
+                st.session_state.trace_eval_enh_reasoning_effort = "none"
+
+    _enh_m = st.session_state.get("trace_eval_enh_model_name") or ""
+    if _enh_m:
+        _enh_t = st.session_state.get("trace_eval_enh_temperature", 0.1)
+        _enh_k = st.session_state.get("trace_eval_enh_max_tokens", 15000)
+        _enh_e = st.session_state.get("trace_eval_enh_reasoning_effort", "none")
+        _enh_e_str = f", effort={_enh_e}" if _enh_e and _enh_e != "none" else ""
+        st.caption(f"Enhanced model override: `{_enh_m}` · temp={_enh_t} · max_tokens={_enh_k}{_enh_e_str}")
+    else:
+        st.caption("Enhanced model: same as sidebar config")
+
     st.session_state.trace_user_prompt_template = st.text_input(
         "User Prompt Template (optional — use {{input}} for injection)",
         value=st.session_state.get("trace_user_prompt_template", ""),
         placeholder="e.g.  Answer this question: {{input}}",
         key="trace_user_tpl_input",
     )
+
+    # ── Metric Picker ────────────────────────────────────────────────────────
+    st.divider()
+    render_section_header("📏", "Evaluation Metrics", "Select the metrics to evaluate both prompts against")
+
+    _default_metrics_set = set(DEFAULT_METRICS)
+    for key in ALL_METRIC_KEYS:
+        ck = f"trace_metric_{key}"
+        if ck not in st.session_state:
+            st.session_state[ck] = key in _default_metrics_set
+
+    for group_label, group_metrics in _TRACE_METRIC_GROUPS:
+        st.markdown(
+            f'<p style="font-size:0.78rem;font-weight:700;text-transform:uppercase;'
+            f'letter-spacing:0.06em;color:#6366f1;margin:12px 0 6px 0;">{group_label}</p>',
+            unsafe_allow_html=True,
+        )
+        cols = st.columns(len(group_metrics))
+        for col, (key, label) in zip(cols, group_metrics):
+            col.checkbox(label, key=f"trace_metric_{key}")
+
+    trace_selected_metrics = [k for k in ALL_METRIC_KEYS if st.session_state.get(f"trace_metric_{k}", False)]
+    if not trace_selected_metrics:
+        st.warning("Select at least one metric.")
+    st.session_state.trace_eval_selected_metrics = trace_selected_metrics
 
     # ── Section D: Run ──────────────────────────────────────────────────────
     st.divider()
@@ -544,11 +780,11 @@ def render_trace_eval_tab() -> None:
             for i, rec in enumerate(pipeline_recs, 1):
                 st.markdown(f"**{i}.** {rec}")
 
-    # Show original vs enhanced diff after pipeline runs
+    # Show original vs current enhanced diff — always compares against the real original
     pipeline_original = st.session_state.get("trace_original_system_prompt", "")
     pipeline_enhanced = st.session_state.get("trace_enhanced_system_prompt", "")
-    if pipeline_enhanced and pipeline_recs:
-        st.write("#### Enhanced Prompt")
+    if pipeline_original and pipeline_enhanced and pipeline_original != pipeline_enhanced:
+        st.write("#### Diff: Original → Current Enhanced")
         render_diff(pipeline_original, pipeline_enhanced, key="diff_trace_pipeline")
 
     st.markdown('<p style="font-size:0.85rem;font-weight:600;color:#1e293b;margin:12px 0 4px 0;">Manual Judge</p>', unsafe_allow_html=True)

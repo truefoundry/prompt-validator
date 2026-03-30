@@ -17,13 +17,17 @@ CONFIG = get_application_config()
 
 
 def _supports_json_schema(model_name: str) -> bool:
-    """Returns True if the model supports OpenAI structured output (beta.chat.completions.parse).
-    Gemini and other non-native OpenAI models routed through TFY do NOT support this endpoint.
+    """Returns True if the model supports json_schema structured output via TFY's normalized API.
+
+    TFY proxies all model providers through an OpenAI-compatible API and handles
+    the structured-output translation natively — so Gemini/Vertex models support
+    response_format json_schema the same way OpenAI models do.
+    Anthropic/Claude models are excluded: they use a different tool-calling mechanism
+    for structured output and don't accept response_format json_schema.
     """
     m = model_name.lower()
-    # Only native OpenAI and Azure OpenAI models support json_schema structured output
-    native_openai = m.startswith("openai-main/") or m.startswith("openai/") or m.startswith("azure/")
-    return native_openai
+    is_anthropic = "claude" in m or m.startswith("anthropic/")
+    return not is_anthropic
 
 
 def _supports_reasoning_effort(model_name: str) -> bool:
@@ -96,16 +100,47 @@ def build_judge_schema(metrics: list[str]) -> dict[str, Any]:
         "required": required_keys,
         "additionalProperties": False,
     }
+    reasoning_schema = {
+        "type": "object",
+        "properties": {
+            "task_intent": {"type": "string"},
+            "expected_response_profile": {"type": "string"},
+            "response_a_correctness": {"type": "string"},
+            "response_b_correctness": {"type": "string"},
+        },
+        "required": ["task_intent", "expected_response_profile", "response_a_correctness", "response_b_correctness"],
+        "additionalProperties": False,
+    }
+    correctness_analysis_schema = {
+        "type": "object",
+        "properties": {
+            "original_correctness_score": {"type": "number"},
+            "enhanced_correctness_score": {"type": "number"},
+            "original_gaps": {"type": "array", "items": {"type": "string"}},
+            "enhanced_gaps": {"type": "array", "items": {"type": "string"}},
+            "correctness_verdict": {"type": "string"},
+        },
+        "required": [
+            "original_correctness_score", "enhanced_correctness_score",
+            "original_gaps", "enhanced_gaps", "correctness_verdict",
+        ],
+        "additionalProperties": False,
+    }
     return {
         "type": "object",
         "properties": {
+            "reasoning": reasoning_schema,
             "original": side_schema,
             "enhanced": side_schema,
+            "correctness_analysis": correctness_analysis_schema,
             "improved": {"type": "boolean"},
             "improvement_summary": {"type": "string"},
             "key_differences": {"type": "array", "items": {"type": "string"}},
         },
-        "required": ["original", "enhanced", "improved", "improvement_summary", "key_differences"],
+        "required": [
+            "reasoning", "original", "enhanced", "correctness_analysis",
+            "improved", "improvement_summary", "key_differences",
+        ],
         "additionalProperties": False,
     }
 
@@ -186,11 +221,9 @@ def get_truefoundry_llm(
             }
             info(f"[LLM] Using json_schema structured output for model={selected_model_name}")
         else:
-            # For Gemini and other non-native-OpenAI models, ANY response_format in model_kwargs
-            # causes langchain_openai>=0.3 to route through beta.chat.completions.parse which
-            # these models don't support. Skip response_format entirely — the prompt instructs
-            # the model to return JSON and we parse the plain text response downstream.
-            info(f"[LLM] Skipping response_format (unsupported via TFY) for model={selected_model_name}")
+            # Anthropic/Claude models don't support response_format json_schema.
+            # The prompt instructs the model to return JSON and we parse the plain text response.
+            info(f"[LLM] Skipping response_format for Anthropic model={selected_model_name}")
     resolved_temperature = temperature if temperature is not None else 0.1
     # Anthropic requires temperature=1 when extended thinking (reasoning_effort) is enabled
     if reasoning_effort and reasoning_effort != "none" and "claude" in selected_model_name.lower():

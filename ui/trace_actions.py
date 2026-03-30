@@ -209,6 +209,7 @@ def run_trace_pipeline() -> None:
                 st.error("No enhanced prompt returned. Cannot proceed with pipeline.")
                 return
             st.session_state.trace_original_system_prompt = original_sys
+            st.session_state["_pending_trace_orig_sys_area"] = original_sys
             st.session_state.trace_enhanced_system_prompt = enhanced_prompt
         except Exception as exc:
             st.error(f"Step 2 failed (apply_recommendation): {exc}")
@@ -225,9 +226,12 @@ def run_trace_pipeline() -> None:
         for i, ti in enumerate(selected_inputs)
     ]
 
+    enh_model = (st.session_state.get("trace_eval_enh_model_name") or "").strip() or None
+    enh_effort = st.session_state.get("trace_eval_enh_reasoning_effort", "none")
+
     with st.spinner("Step 3/3 — Running LLM judge to compare original vs enhanced..."):
         try:
-            judge_data = post_chat({
+            judge_payload = {
                 "sessionId": st.session_state.get("session_id", "123"),
                 "type": "llm_judge",
                 "systemPrompt": original_sys,
@@ -238,7 +242,13 @@ def run_trace_pipeline() -> None:
                 "reasoningEffort": reasoning if reasoning != "none" else None,
                 "recommendations": None,
                 "testCases": test_cases,
-            }, include_grid_header=False)
+                "judgeMetrics": st.session_state.get("trace_eval_selected_metrics") or None,
+                "enhancedModelName": enh_model,
+                "enhancedTemperature": st.session_state.get("trace_eval_enh_temperature") if enh_model else None,
+                "enhancedMaxTokens": st.session_state.get("trace_eval_enh_max_tokens") if enh_model else None,
+                "enhancedReasoningEffort": (enh_effort if enh_effort != "none" else None) if enh_model else None,
+            }
+            judge_data = post_chat(judge_payload, include_grid_header=False)
             result = extract_test_evaluation_result(judge_data)
             st.session_state.trace_llm_judge_result = result
             st.session_state.trace_llm_judge_api_debug = judge_data
@@ -301,20 +311,23 @@ def run_llm_judge_on_traces() -> None:
         st.error("Select at least one trace row before running evaluation.")
         return
 
-    original_sys = st.session_state.get("trace_original_system_prompt", "").strip()
-    enhanced_sys = st.session_state.get("trace_enhanced_system_prompt", "").strip()
-    user_tpl = st.session_state.get("trace_user_prompt_template", "").strip()
-
-    if not original_sys:
-        st.error("Please paste the original system prompt.")
-        return
-    if not enhanced_sys:
-        st.error("Please paste the enhanced system prompt.")
-        return
-
     selected_inputs = [all_inputs[i] for i in selected_indices if i < len(all_inputs)]
     if not selected_inputs:
         st.error("No valid trace rows selected.")
+        return
+
+    # Always read original from the loaded trace — single source of truth.
+    # Session state / text area is display only; traces are ground truth.
+    original_sys = selected_inputs[0].system_prompt.strip()
+    if not original_sys:
+        st.error("The selected trace has no system prompt. Cannot run judge.")
+        return
+
+    enhanced_sys = st.session_state.get("trace_enhanced_system_prompt", "").strip()
+    user_tpl = st.session_state.get("trace_user_prompt_template", "").strip()
+
+    if not enhanced_sys:
+        st.error("No enhanced prompt found. Run the Full Pipeline or Apply Suggestions first.")
         return
 
     test_cases = [
@@ -328,6 +341,8 @@ def run_llm_judge_on_traces() -> None:
     ]
 
     reasoning = st.session_state.get("reasoning_effort", "low")
+    enh_model = (st.session_state.get("trace_eval_enh_model_name") or "").strip() or None
+    enh_effort = st.session_state.get("trace_eval_enh_reasoning_effort", "none")
     payload = {
         "sessionId": st.session_state.get("session_id", "123"),
         "type": "llm_judge",
@@ -339,6 +354,11 @@ def run_llm_judge_on_traces() -> None:
         "reasoningEffort": reasoning if reasoning != "none" else None,
         "recommendations": None,
         "testCases": test_cases,
+        "judgeMetrics": st.session_state.get("trace_eval_selected_metrics") or None,
+        "enhancedModelName": enh_model,
+        "enhancedTemperature": st.session_state.get("trace_eval_enh_temperature") if enh_model else None,
+        "enhancedMaxTokens": st.session_state.get("trace_eval_enh_max_tokens") if enh_model else None,
+        "enhancedReasoningEffort": (enh_effort if enh_effort != "none" else None) if enh_model else None,
     }
     if user_tpl:
         payload["userPromptTemplate"] = user_tpl

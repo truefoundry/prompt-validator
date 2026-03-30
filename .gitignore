@@ -14,3 +14,6 @@ score_prompts.py
 run_cvs_tests.py
 test.ipynb
 prompts/floqasr_prompts_eval.json
+eval/reports/*.json
+eval/reports/*.ndjson
+eval/reports/*.md

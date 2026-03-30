@@ -45,6 +45,7 @@ class FetchTracesResponse(BaseModel):
     traces: list[TraceRecord]
     total_spans: int
     skip_reasons: dict
+    sample_span_names: list[str] = []
 
 
 @app.post("/chat", status_code=status.HTTP_200_OK, response_model=PromptRecommendationResponse)
@@ -111,10 +112,12 @@ async def fetch_traces(request: FetchTracesRequest) -> FetchTracesResponse:
         )
         inputs = parse_spans_to_inputs(spans)
         skip_reasons = getattr(parse_spans_to_inputs, "skip_reasons", {})
+        sample_span_names = getattr(parse_spans_to_inputs, "sample_span_names", [])
         elapsed = round(time.time() - t0, 2)
         info(
             f"[TRACES] Fetched {len(inputs)} traces from {len(spans)} spans | elapsed={elapsed}s"
             + (f" | skip_reasons={skip_reasons}" if skip_reasons else "")
+            + (f" | sample_span_names={sample_span_names}" if sample_span_names and not inputs else "")
         )
         return FetchTracesResponse(
             status_code=SUCCESS_STATUS_CODE,
@@ -122,6 +125,7 @@ async def fetch_traces(request: FetchTracesRequest) -> FetchTracesResponse:
             traces=[TraceRecord(**vars(ti)) for ti in inputs],
             total_spans=len(spans),
             skip_reasons=skip_reasons,
+            sample_span_names=sample_span_names,
         )
     except Exception as e:
         elapsed = round(time.time() - t0, 2)

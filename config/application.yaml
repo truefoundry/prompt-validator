@@ -6,9 +6,9 @@ llm:
 
 assistants:
   get_recommendation:
-    prompt_template_id: "chat_prompt:truefoundry/new-repo/get_recommendation:8"
+    prompt_template_id: "chat_prompt:truefoundry/new-repo/get_recommendation:9"
   apply_recommendation:
-    prompt_template_id: "chat_prompt:truefoundry/new-repo/apply_recommendation:8"
+    prompt_template_id: "chat_prompt:truefoundry/new-repo/apply_recommendation:11"
   prompt_test_eval_recommendation:
     prompt_template_id: "chat_prompt:truefoundry/new-repo/verify_tests:1"
   prompt_test_eval_exact_recommendation:

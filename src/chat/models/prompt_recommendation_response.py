@@ -5,20 +5,20 @@ from typing import List, Optional
 
 
 class CriteriaScores(BaseModel):
-    # Score for each scoring criteria
-    clarity_and_specificity: int
-    structure_and_organization: int
-    output_specification: int
-    contextual_guidance: int
-    error_handling: int
+    # Score for each scoring criteria — defaults to 0 so a partial LLM response still validates
+    clarity_and_specificity: int = 0
+    structure_and_organization: int = 0
+    output_specification: int = 0
+    contextual_guidance: int = 0
+    error_handling: int = 0
 
 class Explanations(BaseModel):
-    # Explanation of the score otained for each criteria
-    clarity_and_specificity: str
-    structure_and_organization: str
-    output_specification: str
-    contextual_guidance: str
-    error_handling: str
+    # Explanation of the score for each criteria — defaults to "" so a partial LLM response still validates
+    clarity_and_specificity: str = ""
+    structure_and_organization: str = ""
+    output_specification: str = ""
+    contextual_guidance: str = ""
+    error_handling: str = ""
 
 class EvaluationResult(BaseModel):
     total_score: int = Field(..., description="Total score for the prompt.")

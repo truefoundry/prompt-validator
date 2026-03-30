@@ -113,15 +113,14 @@ def fetch_live_spans(
             )
         )
 
-    new_filters = []
     if email_filter:
-        new_filters.append({
+        filters.append({
             "spanFieldName": "createdBySubjectSlug",
             "operator": "IN",
             "value": [email_filter],
         })
 
-    query_kwargs: dict = dict(
+    raw_spans = tfy_client.traces.query_spans(
         data_routing_destination=data_routing_destination,
         start_time=start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
         end_time=end_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
@@ -129,10 +128,6 @@ def fetch_live_spans(
         sort_direction="desc",
         limit=limit,
     )
-    if new_filters:
-        query_kwargs["new_filters"] = new_filters
-
-    raw_spans = tfy_client.traces.query_spans(**query_kwargs)
     spans = [span.model_dump() for span in raw_spans]
     logger.info(f"[TRACE_FETCH] Raw spans returned: {len(spans)}")
 
@@ -179,14 +174,18 @@ def _extract_system_prompt(messages: list[dict]) -> str:
     return "\n\n".join(str(m.get("content", "")) for m in sys_msgs)
 
 
-def _extract_llm_output(tfy_output_str: str) -> str:
-    """Extract the assistant message content from tfy.output JSON."""
+def _extract_llm_output(tfy_output_str) -> str:
+    """Extract the assistant message content from tfy.output (string or dict)."""
     try:
-        output = json.loads(tfy_output_str)
+        output = json.loads(tfy_output_str) if isinstance(tfy_output_str, str) else tfy_output_str
     except (json.JSONDecodeError, TypeError):
         return ""
     try:
-        return output["choices"][0]["message"]["content"] or ""
+        content = output["choices"][0]["message"]["content"]
+        if content is None:
+            return ""
+        # content may be a dict (structured output) — serialize it back to a string
+        return content if isinstance(content, str) else json.dumps(content)
     except (KeyError, IndexError, TypeError):
         return ""
 
@@ -196,10 +195,13 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
 
     Returns parsed inputs. Also populates parse_spans_to_inputs.skip_reasons
     with a dict of {reason: count} for diagnostic purposes.
+    Also populates parse_spans_to_inputs.sample_span_names with up to 5 unique
+    span names seen, for diagnostics.
     """
     results: list[TraceInput] = []
     seen_span_ids: set[str] = set()
     skip_reasons: dict[str, int] = {}
+    _seen_span_names: list[str] = []
 
     def _skip(reason: str) -> None:
         skip_reasons[reason] = skip_reasons.get(reason, 0) + 1
@@ -218,34 +220,51 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
             continue
         seen_span_ids.add(span_id)
 
-        # Use tfy.prompt_version_fqn when available; fall back to span_name only when
-        # it looks like an application-specific service (not a bare model-provider name).
-        # Raw model names like "openai/gpt-4o" or "anthropic/claude-haiku-4-5" are skipped.
+        # FQN resolution order:
+        # 1. tfy.prompt_version_fqn top-level attribute
+        # 2. prompt_version_fqn inside tfy.input JSON (TFY gateway spans)
+        # 3. span_name after stripping provider prefix (must contain ":" to be a real FQN)
         _MODEL_PROVIDER_PREFIXES = (
             "openai/", "anthropic/", "google/", "mistral/", "cohere/",
             "fq11-bedrock/", "automation-bedrock/", "automation-eu-bedrock/",
         )
+        # 1) Top-level span attribute (standard path)
         raw_fqn = attrs.get("tfy.prompt_version_fqn", "")
         if raw_fqn and ":" in str(raw_fqn) and "/" in str(raw_fqn):
             prompt_fqn = str(raw_fqn)
         else:
-            span_name = span.get("span_name", "") or ""
-            for prefix in ("ChatCompletion: ", "Model: "):
-                if span_name.startswith(prefix):
-                    span_name = span_name[len(prefix):]
-                    break
-            span_name = span_name.strip()
-            # Skip spans whose only identifier is a bare model-provider name or
-            # anything that lacks ":" — real prompt FQNs always contain ":" e.g.
-            # "chat_prompt:workspace/repo/name:version"
-            if (
-                not span_name
-                or ":" not in span_name
-                or any(span_name.startswith(p) for p in _MODEL_PROVIDER_PREFIXES)
-            ):
-                _skip("no_prompt_fqn_bare_model")
-                continue
-            prompt_fqn = span_name
+            # 2) FQN embedded inside tfy.input JSON (TFY gateway spans store it there)
+            _tfy_input_raw = attrs.get("tfy.input", "")
+            _input_fqn = ""
+            if _tfy_input_raw:
+                try:
+                    _parsed = json.loads(_tfy_input_raw) if isinstance(_tfy_input_raw, str) else _tfy_input_raw
+                    _input_fqn = _parsed.get("prompt_version_fqn", "") or ""
+                except (json.JSONDecodeError, TypeError, AttributeError):
+                    pass
+
+            if _input_fqn and ":" in str(_input_fqn) and "/" in str(_input_fqn):
+                prompt_fqn = str(_input_fqn)
+            else:
+                # 3) Fall back to span name
+                span_name = span.get("span_name", "") or ""
+                for prefix in ("ChatCompletion: ", "Model: "):
+                    if span_name.startswith(prefix):
+                        span_name = span_name[len(prefix):]
+                        break
+                span_name = span_name.strip()
+                # Collect sample span names for diagnostics (up to 5 unique values)
+                if span_name and span_name not in _seen_span_names and len(_seen_span_names) < 5:
+                    _seen_span_names.append(span_name)
+
+                if (
+                    not span_name
+                    or ":" not in span_name
+                    or any(span_name.startswith(p) for p in _MODEL_PROVIDER_PREFIXES)
+                ):
+                    _skip("no_prompt_fqn_bare_model")
+                    continue
+                prompt_fqn = span_name
 
         # ChatCompletion spans store rendered messages in tfy.resolved_input;
         # Model spans store them directly in tfy.input.
@@ -258,7 +277,7 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
             continue
 
         try:
-            tfy_input = json.loads(tfy_input_str)
+            tfy_input = json.loads(tfy_input_str) if isinstance(tfy_input_str, str) else tfy_input_str
         except (json.JSONDecodeError, TypeError):
             _skip("invalid_json_input")
             warnings.warn(f"Span {span_id}: {input_key} is not valid JSON — skipped")
@@ -294,8 +313,9 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
             )
         )
 
-    # Attach skip_reasons as a function attribute for diagnostics
+    # Attach diagnostics as function attributes
     parse_spans_to_inputs.skip_reasons = skip_reasons  # type: ignore[attr-defined]
+    parse_spans_to_inputs.sample_span_names = _seen_span_names  # type: ignore[attr-defined]
     return results
 
 

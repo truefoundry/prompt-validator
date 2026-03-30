@@ -83,6 +83,9 @@ Protected (do not change unless a recommendation explicitly targets it):
 - The output format/schema
 - The number and roles of message blocks
 - **All existing examples, few-shot samples, and sample query blocks** — NEVER remove, summarize, compress, merge, or paraphrase them. They must appear in the output verbatim and in full.
+- **Existing quantitative output constraints** — word counts, sentence counts, character limits, and similar measurable format specifications already present in the original prompt. If a recommendation introduces a format constraint and the original already has one (e.g., "3 sentences", "150 words", "one paragraph"), **strengthen or clarify the existing constraint** rather than replacing it with a different quantity. The original constraint wins.
+- **User-request priority for format**: When applying a format or deliverable recommendation to a prompt that handles diverse user requests (e.g., "write a 3-sentence description"), DO NOT hardcode a single output length or format type (e.g., "500-word blog post"). Instead, use conditional language: "Default format: X unless the user's message specifies a different format or length." A format recommendation should set a default, not override user instructions.
+- **Structure recommendations — insert, do not reorder**: When applying a `no_structure` or "add headers" recommendation, INSERT section headers around the existing content where it naturally fits. Do NOT reorder instructions, move constraints to different sections, or change the logical flow of the original prompt. The goal is to make the same content navigable — not to reorganize it.
 
 Changeable (recommendations may freely modify):
 - Wording and phrasing

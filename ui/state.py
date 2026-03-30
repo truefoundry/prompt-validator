@@ -84,6 +84,11 @@ def init_session_state() -> None:
         # Enhance tab — suggestions
         "enhance_eval_suggestions_result": None,
         "enhance_eval_suggestions_selected": [],
+        # Trace eval — enhanced model override
+        "trace_eval_enh_model_name": "",
+        "trace_eval_enh_temperature": 0.1,
+        "trace_eval_enh_max_tokens": 15000,
+        "trace_eval_enh_reasoning_effort": "none",
         # Trace eval — suggestions + DeepEval metrics
         "trace_suggestions_result": None,
         "trace_suggestions_selected": [],

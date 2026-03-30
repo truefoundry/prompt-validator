@@ -31,9 +31,19 @@ class LLMJudgeSideScores(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class LLMJudgeCorrectnessAnalysis(BaseModel):
+    original_correctness_score: float | None = None
+    enhanced_correctness_score: float | None = None
+    original_gaps: list[str] = []
+    enhanced_gaps: list[str] = []
+    correctness_verdict: str = ""
+
+
 class LLMJudgeOutput(BaseModel):
     original: LLMJudgeSideScores
     enhanced: LLMJudgeSideScores
     improved: bool
     improvement_summary: str
     key_differences: list[str]
+    reasoning: dict | None = None
+    correctness_analysis: LLMJudgeCorrectnessAnalysis | None = None
