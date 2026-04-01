@@ -1,0 +1,50 @@
+@url = http://localhost:21120
+
+### Step 1: Get the list of recommendations for improving a prompt
+POST {{url}}/chat
+Content-Type: application/json
+x-grid: 8091
+
+{
+  "sessionId": "123",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_guardrails_prompt:1",
+  "type": "validation",
+  "recommendations": null
+}
+
+### Step 2: Get the updated prompt after applying recommendations
+POST {{url}}/chat
+Content-Type: application/json
+
+{
+  "sessionId": "123",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_guardrails_prompt:1",
+  "type": "validation",
+  "recommendations": [
+        "Simplify and condense the prompt to improve readability and comprehension."
+        ]
+}
+
+### Step 3: Verify the test cases for a prompt
+POST {{url}}/chat
+Content-Type: application/json
+x-grid: 8091
+
+{
+  "sessionId": "123",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_guardrails_prompt:1",
+  "type": "verify_tests",
+  "recommendations": null
+}
+
+### Step 3 for exact match: Verify test cases for exact match functionality
+POST {{url}}/chat
+Content-Type: application/json
+x-grid: 8091
+
+{
+  "sessionId": "123",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_intent_classifier_prompt:1",
+  "type": "verify_tests_exact",
+  "recommendations": null
+}

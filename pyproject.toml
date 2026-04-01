@@ -1,0 +1,22 @@
+[project]
+name = "prompt-validator"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "deepeval>=3.3.0",
+    "fastapi>=0.116.1",
+    "langchain>=0.3.26",
+    "langchain-community>=0.3.27",
+    "langchain-core>=0.3.69",
+    "langchain-google-vertexai>=2.0.27",
+    "langchain-openai>=0.3.28",
+    "langgraph>=0.5.3",
+    "langgraph-checkpoint-postgres>=2.0.23",
+    "pydantic-settings>=2.10.1",
+    "redis>=6.2.0",
+    "scikit-learn>=1.7.1",
+    "truefoundry>=0.11.2",
+    "uvicorn>=0.35.0",
+]
