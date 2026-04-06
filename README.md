@@ -6,7 +6,7 @@ An end-to-end LLM prompt evaluation and optimization platform. It combines a **F
 
 ## Workflow
 
-![Prompt Tuner Workflow](artifact/prompt-tuner-workflow-v3.png)
+![Prompt Tuner Workflow](artifacts/prompt-tuner-workflow-v3.png)
 
 The platform follows a 7-step iterative loop:
 
@@ -124,7 +124,7 @@ prompt-validator/
 │
 ├── prompts/                      # System prompts for LLM operations
 ├── config/                       # App configuration
-└── artifact/                     # Workflow diagrams
+└── artifacts/                    # Workflow diagrams
 ```
 
 ### Key Data Flow
@@ -143,6 +143,7 @@ prompt-validator/
 ## Prerequisites
 
 - Python 3.12+
+- [uv](https://docs.astral.sh/uv/) — fast Python package manager
 - TrueFoundry account (optional — for production trace integration)
 - LLM API keys: Anthropic / OpenAI / Google
 
@@ -153,11 +154,11 @@ prompt-validator/
 ### 1. Set up environment
 
 ```bash
-python -m venv ./venv
-source ./venv/bin/activate        # macOS/Linux
-# .\venv\Scripts\activate         # Windows
+uv venv
+source .venv/bin/activate        # macOS/Linux
+# .venv\Scripts\activate         # Windows
 
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 ```
 
 ### 2. Configure environment variables
