@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -26,6 +27,7 @@ class TraceInput:
     latency_ms: float
     cost_usd: float
     prompt_fqn: str = ""
+    group_key: str = ""  # FQN if present, else "auto:{sha256(system_prompt from tfy.input)}"
 
 
 def load_spans_from_file(path: str) -> list[dict]:
@@ -128,7 +130,11 @@ def fetch_live_spans(
         sort_direction="desc",
         limit=limit,
     )
-    spans = [span.model_dump() for span in raw_spans]
+    spans = []
+    for span in raw_spans:
+        spans.append(span.model_dump())
+        if len(spans) >= limit:
+            break
     logger.info(f"[TRACE_FETCH] Raw spans returned: {len(spans)}")
 
     return spans
@@ -210,7 +216,7 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
         attrs: dict[str, Any] = span.get("span_attributes") or {}
 
         span_type = attrs.get("tfy.span_type")
-        if span_type not in ("Model", "ChatCompletion"):
+        if span_type != "ChatCompletion":
             _skip(f"wrong_span_type:{span_type or 'None'}")
             continue
 
@@ -223,15 +229,14 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
         # FQN resolution order:
         # 1. tfy.prompt_version_fqn top-level attribute
         # 2. prompt_version_fqn inside tfy.input JSON (TFY gateway spans)
-        # 3. span_name after stripping provider prefix (must contain ":" to be a real FQN)
-        _MODEL_PROVIDER_PREFIXES = (
-            "openai/", "anthropic/", "google/", "mistral/", "cohere/",
-            "fq11-bedrock/", "automation-bedrock/", "automation-eu-bedrock/",
-        )
+        # 3. No FQN → compute group_key from sha256 of system prompt in tfy.input
+        #    (tfy.input = raw template, stable across calls; dynamic sections always appended)
+
         # 1) Top-level span attribute (standard path)
         raw_fqn = attrs.get("tfy.prompt_version_fqn", "")
         if raw_fqn and ":" in str(raw_fqn) and "/" in str(raw_fqn):
             prompt_fqn = str(raw_fqn)
+            group_key = prompt_fqn
         else:
             # 2) FQN embedded inside tfy.input JSON (TFY gateway spans store it there)
             _tfy_input_raw = attrs.get("tfy.input", "")
@@ -245,42 +250,47 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
 
             if _input_fqn and ":" in str(_input_fqn) and "/" in str(_input_fqn):
                 prompt_fqn = str(_input_fqn)
+                group_key = prompt_fqn
             else:
-                # 3) Fall back to span name
+                # 3) No FQN — hash system prompt from tfy.input (raw template, not resolved)
+                prompt_fqn = ""
+                _tfy_input_raw = attrs.get("tfy.input", "")
+                _tmpl_msgs: list[dict] = []
+                if _tfy_input_raw:
+                    try:
+                        _p = json.loads(_tfy_input_raw) if isinstance(_tfy_input_raw, str) else _tfy_input_raw
+                        _tmpl_msgs = _p.get("messages", [])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                _sys_tmpl = _extract_system_prompt(_tmpl_msgs)
+                if _sys_tmpl:
+                    group_key = "auto:" + hashlib.sha256(_sys_tmpl.encode("utf-8")).hexdigest()
+                else:
+                    group_key = "(no group)"
+
+                # Track sample span names for diagnostics
                 span_name = span.get("span_name", "") or ""
                 for prefix in ("ChatCompletion: ", "Model: "):
                     if span_name.startswith(prefix):
                         span_name = span_name[len(prefix):]
                         break
                 span_name = span_name.strip()
-                # Collect sample span names for diagnostics (up to 5 unique values)
                 if span_name and span_name not in _seen_span_names and len(_seen_span_names) < 5:
                     _seen_span_names.append(span_name)
 
-                if (
-                    not span_name
-                    or ":" not in span_name
-                    or any(span_name.startswith(p) for p in _MODEL_PROVIDER_PREFIXES)
-                ):
-                    _skip("no_prompt_fqn_bare_model")
-                    continue
-                prompt_fqn = span_name
-
-        # ChatCompletion spans store rendered messages in tfy.resolved_input;
-        # Model spans store them directly in tfy.input.
-        # Fall back to tfy.input for ChatCompletion spans that lack resolved_input.
-        input_key = "tfy.resolved_input" if span_type == "ChatCompletion" else "tfy.input"
-        tfy_input_str = attrs.get(input_key, "") or attrs.get("tfy.input", "")
+        # ChatCompletion spans store rendered messages in tfy.resolved_input.
+        # Fall back to tfy.input if resolved_input is absent.
+        tfy_input_str = attrs.get("tfy.resolved_input", "") or attrs.get("tfy.input", "")
         if not tfy_input_str:
-            _skip(f"missing_{input_key.replace('.','_')}")
-            warnings.warn(f"Span {span_id}: missing {input_key} — skipped")
+            _skip("missing_tfy_input")
+            warnings.warn(f"Span {span_id}: missing tfy.resolved_input and tfy.input — skipped")
             continue
 
         try:
             tfy_input = json.loads(tfy_input_str) if isinstance(tfy_input_str, str) else tfy_input_str
         except (json.JSONDecodeError, TypeError):
             _skip("invalid_json_input")
-            warnings.warn(f"Span {span_id}: {input_key} is not valid JSON — skipped")
+            warnings.warn(f"Span {span_id}: tfy input is not valid JSON — skipped")
             continue
 
         messages = tfy_input.get("messages", [])
@@ -310,6 +320,7 @@ def parse_spans_to_inputs(spans: list[dict]) -> list[TraceInput]:
                 latency_ms=float(attrs.get("tfy.model.metric.latency_in_ms") or 0),
                 cost_usd=float(attrs.get("tfy.model.metric.cost_in_usd") or 0),
                 prompt_fqn=prompt_fqn,
+                group_key=group_key,
             )
         )
 

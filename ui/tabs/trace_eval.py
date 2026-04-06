@@ -505,30 +505,42 @@ def render_trace_eval_tab() -> None:
     if not trace_inputs:
         return
 
-    # ── Section B: Group by Prompt FQN ─────────────────────────────────────
+    # ── Section B: Group by Prompt Group ───────────────────────────────────
     st.divider()
-    render_section_header("🗂️", "Select Prompt Group", "Pick a prompt FQN and select traces to evaluate", step=2)
+    render_section_header("🗂️", "Select Prompt Group", "Pick a prompt group and select traces to evaluate", step=2)
 
-    # Build FQN options with counts
-    fqn_counts: dict[str, int] = {}
+    # Build group options with counts and system prompt previews for display labels
+    group_counts: dict[str, int] = {}
+    group_key_to_sys: dict[str, str] = {}
     for ti in trace_inputs:
-        fqn = ti.prompt_fqn or "(no FQN)"
-        fqn_counts[fqn] = fqn_counts.get(fqn, 0) + 1
+        gk = getattr(ti, "group_key", None) or ti.prompt_fqn or "(no group)"
+        group_counts[gk] = group_counts.get(gk, 0) + 1
+        if gk not in group_key_to_sys and getattr(ti, "system_prompt", ""):
+            group_key_to_sys[gk] = ti.system_prompt
 
-    fqn_options = sorted(fqn_counts.keys())
-    fqn_display = [f"{fqn}  ({fqn_counts[fqn]} traces)" for fqn in fqn_options]
-    fqn_display_map = dict(zip(fqn_display, fqn_options))
+    def _group_label(gk: str, count: int) -> str:
+        if not gk.startswith("auto:"):
+            return f"{gk}  ({count} traces)"
+        preview = (group_key_to_sys.get(gk, "") or "no system prompt")[:60].replace("\n", " ")
+        return f"[Auto] {preview}…  ({count} traces)"
+
+    group_options = sorted(group_counts.keys())
+    group_display = [_group_label(gk, group_counts[gk]) for gk in group_options]
+    group_display_map = dict(zip(group_display, group_options))
 
     selected_display = st.selectbox(
-        "Group by Prompt FQN",
-        options=fqn_display,
+        "Select Prompt Group",
+        options=group_display,
         key="trace_fqn_selectbox",
     )
-    selected_fqn = fqn_display_map.get(selected_display, "")
-    st.session_state.trace_selected_fqn = selected_fqn
+    selected_group_key = group_display_map.get(selected_display, "")
+    st.session_state.trace_selected_fqn = selected_group_key
 
-    # Filter traces to selected FQN
-    filtered = [ti for ti in trace_inputs if (ti.prompt_fqn or "(no FQN)") == selected_fqn]
+    # Filter traces to selected group
+    filtered = [
+        ti for ti in trace_inputs
+        if (getattr(ti, "group_key", None) or ti.prompt_fqn or "(no group)") == selected_group_key
+    ]
 
     # Auto-fill original system prompt from the first trace that has one
     # Use getattr for backward compat with TraceInput objects loaded before system_prompt was added
@@ -638,14 +650,14 @@ def render_trace_eval_tab() -> None:
     # ── Section C: Prompt Configuration ────────────────────────────────────
     st.divider()
     render_section_header("⚙️", "Configure Prompts",
-                          f"Group: {selected_fqn} — original system prompt auto-filled from trace data", step=3)
+                          f"Group: {selected_group_key} — original system prompt auto-filled from trace data", step=3)
 
-    # Auto-populate original system prompt when FQN changes and traces have a system prompt
+    # Auto-populate original system prompt when group changes and traces have a system prompt
     last_fqn = st.session_state.get("_trace_last_autofilled_fqn", "")
-    if fqn_sys_prompt and selected_fqn != last_fqn:
+    if fqn_sys_prompt and selected_group_key != last_fqn:
         st.session_state.trace_original_system_prompt = fqn_sys_prompt
         st.session_state["trace_orig_sys_area"] = fqn_sys_prompt
-        st.session_state._trace_last_autofilled_fqn = selected_fqn
+        st.session_state._trace_last_autofilled_fqn = selected_group_key
 
     col_orig, col_enh = st.columns(2)
     with col_orig:

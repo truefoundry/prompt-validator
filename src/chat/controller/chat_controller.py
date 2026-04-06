@@ -37,6 +37,7 @@ class TraceRecord(BaseModel):
     latency_ms: float
     cost_usd: float
     prompt_fqn: str
+    group_key: str = ""
 
 
 class FetchTracesResponse(BaseModel):
