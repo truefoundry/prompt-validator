@@ -1,0 +1,252 @@
+import asyncio
+import time
+import traceback
+import json
+import re
+from typing import List, Type
+from langchain_core.messages import AIMessage
+from langchain.output_parsers import PydanticOutputParser
+from langgraph.types import StateSnapshot
+from pydantic import BaseModel
+
+from src.chat.models.prompt_recommendation_request import PromptRecommendationRequest
+from src.chat.models.prompt_recommendation_response import PromptRecommendationResponse, Content, EvaluationResult, PromptMessageList
+from src.chat.utils.constants import RequestType
+from src.chat.utils.chat_utils import print_event
+# from src.chat.utils.langfuse_handler_util import LangfuseHandler
+from src.chat.graph.primary_graph import _build_state_graph
+from src.common.config.app_config import get_application_config
+from src.common.service.logging.logger import error, info
+
+CONFIG = get_application_config()
+
+
+def _sanitize_json_like_output(raw_text: str) -> str:
+    """Sanitize common LLM JSON formatting issues before parsing."""
+    sanitized = raw_text.strip()
+
+    # Remove fenced markdown blocks like ```json ... ```
+    sanitized = re.sub(r"^\s*```(?:json)?\s*", "", sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r"\s*```\s*$", "", sanitized)
+
+    # Remove trailing commas before closing objects/arrays.
+    sanitized = re.sub(r",\s*([}\]])", r"\1", sanitized)
+    return sanitized.strip()
+
+
+def _parse_with_sanitizer(raw_text: str, model_cls: Type[BaseModel]) -> BaseModel | None:
+    """Parse model output with strict parser first, then sanitized JSON fallback."""
+    parser = PydanticOutputParser(pydantic_object=model_cls)
+    try:
+        return parser.parse(raw_text)
+    except Exception as primary_error:
+        try:
+            sanitized = _sanitize_json_like_output(raw_text)
+            parsed_json = json.loads(sanitized)
+            return model_cls.model_validate(parsed_json)
+        except Exception as fallback_error:
+            error(f"Error parsing output: {primary_error}")
+            error(f"Fallback parsing failed after sanitization: {fallback_error}")
+            return None
+
+
+def _get_last_ai_message(events):
+    """
+    Retrieve the last AI message from a list of events, ensuring the message
+    does not include any tool calls.
+
+    Args:
+        events (list): A list of event dictionaries, where each event can contain messages.
+
+    Returns:
+        str or None: The content of the last AI message without tool calls, concatenated if content is a list;
+                     otherwise, returns None if no such message exists.
+    """
+    # Iterate over events in reverse to find the last message
+    for event in reversed(events):
+        if event.get("messages"):
+            last_message = event["messages"][-1]
+            if isinstance(last_message, AIMessage) and not last_message.tool_calls:
+                try:
+                    content = last_message.content
+                    # Flatten list and send as string
+                    if isinstance(content, list):
+                        content = " ".join(
+                            [str(item) for sublist in content for item in sublist]
+                        )
+                    # Flatten dict and send as string
+                    elif isinstance(content, dict):
+                        content = " ".join(
+                            [str(v) for k, v in content.items() if isinstance(v, str)]
+                        )
+                    elif not isinstance(content, str):
+                        content = str(content)
+                    return content.strip()
+                except Exception as e:
+                    error(f"Error while processing last AI message: {e}")
+    return None
+
+
+class ChatService:
+    @staticmethod
+    async def get_chat_response(request: PromptRecommendationRequest) -> PromptRecommendationResponse | None:
+        """
+        Get chat response
+        Args:
+            request (PromptRecommendationRequest): The request to the chat service.
+        Returns:
+            PromptRecommendationResponse: The response from the chat service.
+        """
+        try:
+            # Build the state graph
+            graph = await _build_state_graph(request)
+
+            # Graph Configuration
+            configuration = _get_graph_configuration(request)
+
+            # print the graph
+            # signal(graph.get_graph().draw_mermaid())
+
+            events = await _resume_a_new_conversation(request, configuration, graph)
+            chat_response = await _process_events_and_build_response(
+                request, events, graph, configuration
+            )
+
+            return chat_response
+
+        except Exception as e:
+            error(f"[ChatService] get_chat_response failed | {type(e).__name__}: {e}\n{traceback.format_exc()}")
+            raise e
+
+
+def _get_graph_configuration(request: PromptRecommendationRequest) -> dict:
+    """
+    Get the graph configuration for the given request.
+
+    Args:
+        request (PromptRecommendationRequest): The request to the chat service.
+
+    Returns:
+        dict: The graph configuration.
+    """
+
+    return {
+        # "callbacks": [LangfuseHandler.get_handler()]
+        # if CONFIG.get("LANGFUSE_ENABLED")
+        # else [],
+        "configurable": {
+            "thread_id": request.session_id,
+            "prompt_fqn": request.prompt_fqn or "pasted_prompt",
+        },
+        "recursion_limit": 15,
+    }
+
+
+async def _resume_a_new_conversation(request, configuration, graph):
+    """
+    Resume a new conversation with the chatbot.
+    Args:
+        request (PromptRecommendationRequest): The request to the chat service.
+        configuration (dict): The graph configuration.
+        graph (CompiledGraph): The compiled state graph.
+    Returns:
+        list: The list of events from the graph.
+    """
+    events = []
+    prompt_label = request.prompt_fqn or "pasted_prompt"
+    async for event in graph.astream(
+        {"messages": ("user", prompt_label), "request": request.model_dump()},
+        config=configuration,
+        stream_mode="values",
+    ):
+        events.append(event)
+    return events
+
+
+async def _process_events_and_build_response(request, events, graph, configuration):
+    """Process events and build the chat response."""
+    _printed = set()
+    last_message = None
+
+    try:
+        for event in events:
+            print_event(event, _printed)
+        last_message = _get_last_ai_message(events)
+
+    except Exception as e:
+        error(f"process events and build response failed: {e}")
+        last_message = (
+            f"I am sorry, I dont have sufficient information to fulfill your request."
+        )
+
+    if not last_message:
+        error(f"[GRAPH] No AI message returned | type={request.type} | session={request.session_id}")
+        return PromptRecommendationResponse(
+            session_id=request.session_id,
+            status_code="5013",
+            status_description="The provided parameters are invalid. Please refer to the developer portal for correct specifications.",
+            content=Content(
+                eval_result=None,
+                final_prompt_result=None,
+                test_evaluation_result=None
+            ),
+            prompt_fqn=request.prompt_fqn
+        )
+    info(f"[GRAPH] Last message length={len(last_message)} | type={request.type}")
+    eval_result, prompt_result, test_evaluation_result = None, None, None
+    # Return the last message from the graph, usually for Uninterrupted flows
+    if request.type == RequestType.VALIDATION.value:
+        if not request.recommendations:
+            info(f"[PARSE] Parsing EvaluationResult (get_recommendation)")
+            eval_result = _parse_with_sanitizer(last_message, EvaluationResult)
+            if eval_result:
+                info(f"[PARSE] score={eval_result.total_score} | recs={len(eval_result.recommendations)}")
+            else:
+                error(f"[PARSE] Failed to parse EvaluationResult | raw_len={len(last_message)}")
+        else:
+            info(f"[PARSE] Parsing PromptMessageList (apply_recommendation)")
+            prompt_result = _parse_with_sanitizer(last_message, PromptMessageList)
+            if prompt_result:
+                info(f"[PARSE] PromptMessageList messages={len(prompt_result.prompt_messages_list)}")
+            else:
+                error(f"[PARSE] Failed to parse PromptMessageList | raw_len={len(last_message)}")
+    elif request.type in [
+        RequestType.VERIFY_TESTS.value,
+        RequestType.VERIFY_TESTS_EXACT.value,
+        RequestType.LLM_JUDGE.value,
+        RequestType.GET_BEHAVIORAL_RECOMMENDATIONS.value,
+        RequestType.GENERATE_SUGGESTIONS.value,
+        RequestType.ARENA_COMPARISON.value,
+        RequestType.DEEPEVAL_PROMPT_METRICS.value,
+    ]:
+        info(f"[PARSE] Parsing JSON result for type={request.type}")
+        try:
+            test_evaluation_result = json.loads(last_message)
+            if request.type == RequestType.GET_BEHAVIORAL_RECOMMENDATIONS.value:
+                recs = test_evaluation_result.get("behavioral_recommendations", []) if isinstance(test_evaluation_result, dict) else []
+                info(f"[PARSE] behavioral_recommendations count={len(recs)}")
+            elif request.type == RequestType.LLM_JUDGE.value:
+                summary = test_evaluation_result.get("summary", {}) if isinstance(test_evaluation_result, dict) else {}
+                info(f"[PARSE] llm_judge summary: improved={summary.get('improved_count')}/{summary.get('total_cases')}")
+            else:
+                results = test_evaluation_result.get("results", {}) if isinstance(test_evaluation_result, dict) else {}
+                info(f"[PARSE] test_evaluation tests={len(results.get('all_tests', []))}")
+        except Exception:
+            try:
+                test_evaluation_result = json.loads(_sanitize_json_like_output(last_message))
+                info(f"[PARSE] Parsed after sanitization")
+            except Exception as e:
+                error(f"[PARSE] Failed to parse JSON result: {e} | raw_len={len(last_message)}")
+                test_evaluation_result = None
+
+    return PromptRecommendationResponse(
+        session_id=request.session_id,
+        status_code="0000",
+        status_description="Success.",
+        content=Content(
+            eval_result=eval_result,
+            final_prompt_result=prompt_result,
+            test_evaluation_result=test_evaluation_result
+        ),
+        prompt_fqn=request.prompt_fqn
+    )

@@ -1,0 +1,56 @@
+@url = http://localhost:21120
+
+### Step 1: Get the list of recommendations for improving a prompt
+POST {{url}}/chat
+Content-Type: application/json
+x-grid: 8091
+
+{
+  "sessionId": "123",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/prompt-recommend-test:2",
+  "modelName": "openai-main/gpt-4o",
+  "type": "validation",
+  "recommendations": null
+}
+
+### Step 2: Get the updated prompt after applying recommendations
+POST {{url}}/chat
+Content-Type: application/json
+
+{
+  "sessionId": "123",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_guardrails_prompt:1",
+  "modelName": "openai-main/gpt-4o",
+  "type": "validation",
+  "recommendations": [
+        "Simplify and condense the instructions to improve clarity and reduce potential confusion.",
+        "Enhance the separation between examples and main instructions to improve readability and flow.",
+        "Clarify the output format requirements, especially the distinction between 'simple string' and JSON, to avoid implementation errors.",
+        "Include additional guidance for handling ambiguous queries that do not clearly fall into in-scope or out-of-scope categories.",
+        "Consider providing a summary or checklist of key rules to ensure consistent application of guidelines."
+        ]
+}
+
+### Step 3: Verify the test cases for a prompt
+POST {{url}}/chat
+Content-Type: application/json
+x-grid: 8091
+
+{
+  "sessionId": "123",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_guardrails_prompt:1",
+  "type": "verify_tests",
+  "recommendations": null
+}
+
+### Step 4 for exact match: Verify test cases for exact match functionality
+POST {{url}}/chat
+Content-Type: application/json
+x-grid: 8091
+
+{
+  "sessionId": "123",
+  "promptFQN": "chat_prompt:truefoundry/new-repo/cvs_intent_classifier_prompt:1",
+  "type": "verify_tests_exact",
+  "recommendations": null
+}

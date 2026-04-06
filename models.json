@@ -1,0 +1,16 @@
+{
+  "models": [
+    "openai-main/gpt-4",
+    "openai-main/gpt-4o",
+    "openai-main/gpt-5",
+    "tfy-ai-vertex/gemini-2.5-flash",
+    "tfy-ai-vertex/gemini-2.5-pro",
+    "tfy-ai-vertex/gemini-3-flash-preview",
+    "tfy-ai-vertex/gemini-3-pro-preview",
+    "tfy-ai-vertex/gemini-3.1-pro-preview",
+    "tfy-ai-anthropic/claude-sonnet-4-6",
+    "tfy-ai-anthropic/claude-opus-4-6",
+    "tfy-ai-vertex/anthropic-claude-opus-4",
+    "tfy-ai-vertex/anthropic-claude-opus-4-5"
+  ]
+}

@@ -1,0 +1,26 @@
+[project]
+name = "prompt-validator"
+version = "0.1.0"
+description = "LLM prompt evaluation and optimization tool with trace analysis, DeepEval metrics, and LLM-as-judge"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "deepeval>=3.9.2",
+    "fastapi>=0.116.1",
+    "langchain>=0.3.26",
+    "langchain-community>=0.3.27",
+    "langchain-core>=0.3.69",
+    "langchain-google-vertexai>=2.0.27",
+    "langchain-openai>=0.3.28",
+    "langgraph>=0.5.3",
+    "langgraph-checkpoint-postgres>=2.0.23",
+    "nest_asyncio>=1.6.0",
+    "pydantic-settings>=2.10.1",
+    "redis>=6.2.0",
+    "scikit-learn>=1.7.1",
+    "streamlit>=1.46.1",
+    "truefoundry>=0.14.2",
+    "truefoundry-sdk>=0.2.0",
+    "uvicorn>=0.35.0",
+    "weasyprint>=68.1",
+]

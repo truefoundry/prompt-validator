@@ -1,0 +1,46 @@
+application_details:
+  ml_repo: "new-repo"
+
+llm:
+  model_name: "tfy-ai-vertex/gemini-3-flash-preview"
+
+assistants:
+  get_recommendation:
+    prompt_template_id: "chat_prompt:truefoundry/new-repo/get_recommendation:9"
+  apply_recommendation:
+    prompt_template_id: "chat_prompt:truefoundry/new-repo/apply_recommendation:11"
+  prompt_test_eval_recommendation:
+    prompt_template_id: "chat_prompt:truefoundry/new-repo/verify_tests:1"
+  prompt_test_eval_exact_recommendation:
+    prompt_template_id: "chat_prompt:truefoundry/new-repo/verify_tests_exact:1"
+
+metrics:
+  prompt_metrics:
+    correctness_geval:
+      threshold: 0.7
+    bias_metric:
+      threshold: 0.5
+    toxicity_metric:
+      threshold: 0.5
+  rag_metrics:
+    context_precision:
+      threshold: 0.7
+
+checkpointer:
+  type: "in_memory"
+
+redis:
+  host: "localhost"
+  port: 6380
+  db: 0
+  cert_path: "/apps/python/gcp/pythoncerts/chat-history-redis-store-ca.pem" # Path to the certificate file is only required for GCP
+  max_connections: 5
+  socket_timeout: 5
+  socket_connect_timeout: 5
+
+postgres:
+  host: "localhost"
+  port: 5432
+  db: "default_db"
+  user: "user"
+

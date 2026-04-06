@@ -1,0 +1,6 @@
+Evaluate the following prompt. The prompt may be provided as plain text or as a serialized list of message objects (each with a "role" and "content" field). Evaluate the actual instructional content across all message blocks.
+
+Prompt to evaluate:
+{{input}}
+
+Return only the JSON object. No markdown fences, no explanation.

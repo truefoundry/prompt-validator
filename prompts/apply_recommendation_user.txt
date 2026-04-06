@@ -1,0 +1,10 @@
+Below is the input for your task. It contains two keys:
+- "prompt_messages_list": the original prompt to improve (list of role/content message objects)
+- "recommendations": the ordered list of improvements to apply
+
+Apply all recommendations and return the improved prompt as a JSON array.
+
+Input:
+{{input}}
+
+Return only the JSON array. No markdown fences, no explanation.

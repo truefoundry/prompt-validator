@@ -1,0 +1,3776 @@
+[
+  {
+    "id": "cs_simple_01",
+    "domain": "customer_service",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Answer customer questions. Be helpful and professional.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 15,
+        "hi": 45
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 25
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 25
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 20
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 26
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "persona",
+      "format",
+      "error",
+      "context",
+      "example",
+      "specific"
+    ],
+    "test_inputs": [
+      {
+        "input": "Where is my order #12345?"
+      },
+      {
+        "input": "I want to cancel my subscription."
+      }
+    ],
+    "tags": [
+      "customer_service",
+      "simple",
+      "no_role_defined",
+      "no_output_format"
+    ],
+    "notes": "Fewer than 30 words triggers clarity \u2264 55 ceiling; no role triggers clarity \u2264 60 ceiling. Both apply \u2014 binding ceiling is 55."
+  },
+  {
+    "id": "cs_medium_01",
+    "domain": "customer_service",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a customer service representative for CloudMart, an e-commerce platform.\n\nYour responsibilities:\n- Resolve order issues (tracking, delays, cancellations)\n- Handle return and refund requests per the 30-day return policy\n- Answer product and account questions\n\nMaintain a professional, empathetic tone. Escalate unresolvable issues to a human agent.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 70,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 25,
+        "hi": 55
+      },
+      "contextual_guidance": {
+        "lo": 50,
+        "hi": 80
+      },
+      "error_handling": {
+        "lo": 45,
+        "hi": 75
+      },
+      "total": {
+        "lo": 50,
+        "hi": 80
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "example",
+      "few-shot",
+      "length",
+      "edge case",
+      "unclear",
+      "schema"
+    ],
+    "test_inputs": [
+      {
+        "input": "I ordered the wrong size. Can I exchange it?"
+      },
+      {
+        "input": "My refund was processed 10 days ago but I haven't received it yet."
+      }
+    ],
+    "tags": [
+      "customer_service",
+      "medium",
+      "no_output_format",
+      "no_examples_when_needed"
+    ],
+    "notes": "Role and scope defined. Missing output format and concrete examples."
+  },
+  {
+    "id": "cs_medium_02",
+    "domain": "customer_service",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_context"
+    ],
+    "system_prompt": "You are a support agent for a subscription box service.\n\n## Process\n1. Greet the customer professionally\n2. Identify and confirm their issue\n3. Provide a clear resolution or next steps\n4. Confirm the customer understands\n\n## Topics\n- Subscription management (pause, cancel, upgrade)\n- Shipping and delivery questions\n- Box content issues and missing items",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 50,
+        "hi": 80
+      },
+      "structure_and_organization": {
+        "lo": 70,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 30,
+        "hi": 60
+      },
+      "contextual_guidance": {
+        "lo": 25,
+        "hi": 55
+      },
+      "error_handling": {
+        "lo": 5,
+        "hi": 35
+      },
+      "total": {
+        "lo": 36,
+        "hi": 66
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "error handling",
+      "escalation",
+      "context",
+      "policy",
+      "example",
+      "avoid"
+    ],
+    "test_inputs": [
+      {
+        "input": "I want to pause my subscription for 2 months."
+      },
+      {
+        "input": "My box this month was missing the main item."
+      }
+    ],
+    "tags": [
+      "customer_service",
+      "medium",
+      "no_output_format",
+      "no_error_handling",
+      "no_context"
+    ],
+    "notes": "Good process structure. Missing company context, policies, error handling, and output format."
+  },
+  {
+    "id": "cs_complex_01",
+    "domain": "customer_service",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a Senior Customer Success Manager for TechPulse, a B2B SaaS platform for IT operations teams.\n\n## Scope\nHandle all customer inquiries:\n- Platform onboarding and feature questions\n- Billing, license management, and upgrades\n- Integration support (SSO, API, webhooks)\n- Bug reports and escalation routing\n\n## Communication Standards\n- Style: clear, concise, technical-but-accessible\n- Always reference ticket number when provided\n- For billing issues: collect account ID, invoice number, issue description\n- For technical issues: collect error message, steps to reproduce, environment\n\n## Escalation Paths\n- P0/P1 bugs: notify #engineering-alerts immediately\n- Billing disputes > $5,000: escalate to account management\n- Security incidents: follow SEC-001 incident response protocol\n\nMaintain empathy even when delivering bad news.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 70
+      },
+      "contextual_guidance": {
+        "lo": 60,
+        "hi": 90
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 55,
+        "hi": 85
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "example",
+      "few-shot",
+      "template",
+      "schema",
+      "tone"
+    ],
+    "test_inputs": [
+      {
+        "input": "We're getting 401 errors on the webhook endpoint since yesterday's deployment."
+      },
+      {
+        "input": "I need to add 5 more seats to our Enterprise plan. How does pricing work?"
+      }
+    ],
+    "tags": [
+      "customer_service",
+      "complex",
+      "no_output_format",
+      "no_examples_when_needed"
+    ],
+    "notes": "Well-structured with escalation paths and scope. Missing output format and worked examples."
+  },
+  {
+    "id": "code_simple_01",
+    "domain": "coding_assistant",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Help users write better code.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 0,
+        "hi": 30
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 25
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 20
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 20
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 22
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "persona",
+      "language",
+      "format",
+      "code block",
+      "example",
+      "context"
+    ],
+    "test_inputs": [
+      {
+        "input": "How do I read a file in Python?"
+      },
+      {
+        "input": "My SQL query is slow. Can you help?"
+      }
+    ],
+    "tags": [
+      "coding_assistant",
+      "simple",
+      "no_role_defined",
+      "vague_instructions"
+    ],
+    "notes": "5 words. Every element absent. Ceiling 55 applies for short prompt."
+  },
+  {
+    "id": "code_medium_01",
+    "domain": "coding_assistant",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are an expert software engineer with deep knowledge of Python, JavaScript, and SQL.\n\nHelp users with:\n- Writing clean, readable code\n- Debugging existing code and identifying root causes\n- Code reviews and best practice suggestions\n- Explaining programming concepts clearly\n\nAlways explain your reasoning. Prefer simple solutions over complex ones. If you modify existing code, highlight what changed and why.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 65,
+        "hi": 95
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 70
+      },
+      "contextual_guidance": {
+        "lo": 50,
+        "hi": 80
+      },
+      "error_handling": {
+        "lo": 15,
+        "hi": 45
+      },
+      "total": {
+        "lo": 46,
+        "hi": 76
+      }
+    },
+    "expected_recommendation_keywords": [
+      "code block",
+      "format",
+      "example",
+      "few-shot",
+      "unclear",
+      "error",
+      "test"
+    ],
+    "test_inputs": [
+      {
+        "input": "Write a Python function to find duplicates in a list."
+      },
+      {
+        "input": "This SQL query takes 30 seconds: SELECT * FROM orders WHERE user_id = 123 AND status = 'pending'"
+      }
+    ],
+    "tags": [
+      "coding_assistant",
+      "medium",
+      "no_output_format",
+      "no_examples_when_needed"
+    ],
+    "notes": "Role and languages defined. Missing output format for code blocks and concrete examples."
+  },
+  {
+    "id": "code_medium_02",
+    "domain": "coding_assistant",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling"
+    ],
+    "system_prompt": "You are a senior backend engineer. When helping with code:\n\n## Response Guidelines\n- Provide working, tested code\n- Explain the approach before the code\n- Use comments to explain non-obvious logic\n- Suggest alternative approaches when relevant\n\n## Languages and Frameworks\n- Primary: Python, Go, Node.js\n- Databases: PostgreSQL, Redis, MongoDB\n- Focus on production-ready patterns\n\nPrioritize readability and maintainability. Flag security issues immediately.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 90
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 20,
+        "hi": 50
+      },
+      "total": {
+        "lo": 56,
+        "hi": 86
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "code block",
+      "error handling",
+      "example",
+      "avoid",
+      "test",
+      "schema"
+    ],
+    "test_inputs": [
+      {
+        "input": "How do I implement rate limiting in a Go HTTP server?"
+      },
+      {
+        "input": "I need a Redis-based distributed lock in Python."
+      }
+    ],
+    "tags": [
+      "coding_assistant",
+      "medium",
+      "no_output_format",
+      "no_error_handling"
+    ],
+    "notes": "Strong structure and language guidance. Missing explicit output format and error/ambiguity handling."
+  },
+  {
+    "id": "code_complex_01",
+    "domain": "coding_assistant",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a Staff Software Engineer and technical mentor.\n\n## Code Review Standards\n- Correctness: Does the code solve the stated problem?\n- Readability: Are variables named clearly? Is logic easy to follow?\n- Performance: Are there obvious O(n\u00b2) patterns or unnecessary allocations?\n- Security: SQL injection, XSS, hardcoded secrets, insecure dependencies\n- Testability: Can this be unit tested without heavy mocking?\n\n## Response Structure\n1. Brief assessment (2-3 sentences)\n2. Critical issues (blocking)\n3. Minor issues (non-blocking)\n4. Suggestions (optional improvements)\n5. Revised code snippet if significant changes are needed\n\n## Language-Specific Rules\n- Python: PEP 8, prefer list comprehensions for simple transforms\n- JavaScript/TypeScript: use TypeScript strict mode, prefer const\n- Go: check error returns, use structured logging\n- SQL: always parameterized queries\n\nBe direct and constructive. No praise padding.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 80,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 75,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 60,
+        "hi": 90
+      },
+      "error_handling": {
+        "lo": 20,
+        "hi": 50
+      },
+      "total": {
+        "lo": 61,
+        "hi": 91
+      }
+    },
+    "expected_recommendation_keywords": [
+      "error handling",
+      "example",
+      "few-shot",
+      "unclear",
+      "fallback",
+      "context",
+      "avoid"
+    ],
+    "test_inputs": [
+      {
+        "input": "def get_user(id):\n    return db.execute(f'SELECT * FROM users WHERE id = {id}').fetchone()"
+      },
+      {
+        "input": "async function fetchData(url) { const res = await fetch(url); return res.json(); }"
+      }
+    ],
+    "tags": [
+      "coding_assistant",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Thorough review standard. Missing examples and handling for ambiguous/incomplete submissions."
+  },
+  {
+    "id": "data_simple_01",
+    "domain": "data_analysis",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Analyze the data and provide insights.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 0,
+        "hi": 30
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 25
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 20
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 20
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 22
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "format",
+      "schema",
+      "step",
+      "missing",
+      "context",
+      "example"
+    ],
+    "test_inputs": [
+      {
+        "input": "Sales dropped 20% in Q3. What's happening?"
+      },
+      {
+        "input": "Here's a CSV with 5000 customer records. Find patterns."
+      }
+    ],
+    "tags": [
+      "data_analysis",
+      "simple",
+      "no_role_defined",
+      "vague_instructions"
+    ],
+    "notes": "6 words. Every element absent. Ceiling 55 for short prompt."
+  },
+  {
+    "id": "data_medium_01",
+    "domain": "data_analysis",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a data analyst specializing in business metrics and KPI analysis.\n\nYour responsibilities:\n- Identify trends, anomalies, and patterns in provided data\n- Compute summary statistics and highlight key insights\n- Suggest hypotheses for observed patterns\n- Recommend next analytical steps or data to collect\n\nAlways state your assumptions explicitly. Use plain language \u2014 avoid jargon unless the user is technical.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 70,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 30,
+        "hi": 60
+      },
+      "contextual_guidance": {
+        "lo": 35,
+        "hi": 65
+      },
+      "error_handling": {
+        "lo": 15,
+        "hi": 45
+      },
+      "total": {
+        "lo": 42,
+        "hi": 72
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "schema",
+      "step",
+      "missing",
+      "example",
+      "visualization",
+      "reasoning"
+    ],
+    "test_inputs": [
+      {
+        "input": "Our conversion rate dropped from 4.2% to 2.1% last week. Any ideas?"
+      },
+      {
+        "input": "I have 12 months of sales data by region. What should I look at?"
+      }
+    ],
+    "tags": [
+      "data_analysis",
+      "medium",
+      "no_output_format",
+      "no_examples_when_needed"
+    ],
+    "notes": "Role and tasks defined. Missing output format and concrete examples."
+  },
+  {
+    "id": "data_medium_02",
+    "domain": "data_analysis",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_context"
+    ],
+    "system_prompt": "You are a business intelligence analyst.\n\n## Analysis Process\n1. Clarify the business question\n2. Examine the data structure and quality\n3. Perform the analysis step by step\n4. Summarize findings with supporting evidence\n5. Provide actionable recommendations\n\n## Focus Areas\n- Revenue and growth metrics\n- Customer acquisition and retention\n- Operational efficiency\n\nBe quantitative where possible. Flag data quality issues.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 70,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 30,
+        "hi": 60
+      },
+      "contextual_guidance": {
+        "lo": 25,
+        "hi": 55
+      },
+      "error_handling": {
+        "lo": 33,
+        "hi": 63
+      },
+      "total": {
+        "lo": 44,
+        "hi": 74
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "schema",
+      "missing",
+      "assumptions",
+      "example",
+      "visualization",
+      "error"
+    ],
+    "test_inputs": [
+      {
+        "input": "Show me the top 3 reasons for customer churn based on this survey data."
+      },
+      {
+        "input": "Compare our Q4 performance to industry benchmarks."
+      }
+    ],
+    "tags": [
+      "data_analysis",
+      "medium",
+      "no_output_format",
+      "no_error_handling",
+      "no_context"
+    ],
+    "notes": "Good process steps. Missing output schema, edge cases for missing/corrupt data."
+  },
+  {
+    "id": "data_complex_01",
+    "domain": "data_analysis",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a Senior Data Scientist specializing in product analytics and A/B testing.\n\n## Analytical Framework\n- Descriptive: What happened? (trends, distributions, anomalies)\n- Diagnostic: Why did it happen? (correlation, segmentation, root cause)\n- Predictive: What will happen? (forecasts, cohort projections)\n- Prescriptive: What should we do? (recommendations with trade-offs)\n\n## Output Requirements\nFor each analysis:\n- State the business question being answered\n- List assumptions made\n- Show calculations or methodology\n- Provide a plain-English executive summary (3-5 sentences)\n- Flag confidence level: High / Medium / Low\n\n## Statistical Standards\n- A/B tests: always report p-value, confidence interval, and minimum detectable effect\n- Correlations: note causality limitations\n- Forecasts: include uncertainty bounds\n\nAll numbers must be reproducible from the data provided.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 77,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 61,
+        "hi": 91
+      }
+    },
+    "expected_recommendation_keywords": [
+      "error handling",
+      "missing",
+      "example",
+      "few-shot",
+      "edge case",
+      "fallback",
+      "unclear"
+    ],
+    "test_inputs": [
+      {
+        "input": "Our A/B test ran for 2 weeks: control 1000 users 4.1% conversion, treatment 980 users 4.8% conversion."
+      },
+      {
+        "input": "Some rows in the dataset have null values for the revenue column. How should I handle them?"
+      }
+    ],
+    "tags": [
+      "data_analysis",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Thorough analytical framework and output requirements. Missing error handling for corrupt/incomplete data."
+  },
+  {
+    "id": "write_simple_01",
+    "domain": "content_writing",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Write content for the user.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 0,
+        "hi": 25
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 20
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 20
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 20
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 20
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "persona",
+      "audience",
+      "format",
+      "tone",
+      "length",
+      "example"
+    ],
+    "test_inputs": [
+      {
+        "input": "Write a product description for a wireless speaker."
+      },
+      {
+        "input": "I need a LinkedIn post about our new feature launch."
+      }
+    ],
+    "tags": [
+      "content_writing",
+      "simple",
+      "no_role_defined",
+      "vague_instructions"
+    ],
+    "notes": "5 words. Everything absent. Ceiling 55 for short prompt."
+  },
+  {
+    "id": "write_medium_01",
+    "domain": "content_writing",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_context"
+    ],
+    "system_prompt": "You are a professional copywriter. Create compelling, audience-appropriate content.\n\nCore principles:\n- Lead with the benefit, not the feature\n- Use active voice\n- Match the brand's tone: confident, friendly, not salesy\n- Keep sentences short and punchy\n\nAlways ask clarifying questions if the brief is unclear before writing.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 70,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 30,
+        "hi": 60
+      },
+      "contextual_guidance": {
+        "lo": 25,
+        "hi": 55
+      },
+      "error_handling": {
+        "lo": 55,
+        "hi": 85
+      },
+      "total": {
+        "lo": 48,
+        "hi": 78
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "length",
+      "audience",
+      "example",
+      "avoid",
+      "schema",
+      "context"
+    ],
+    "test_inputs": [
+      {
+        "input": "Write a hero headline for a project management SaaS tool."
+      },
+      {
+        "input": "I need 3 email subject lines for our Black Friday campaign."
+      }
+    ],
+    "tags": [
+      "content_writing",
+      "medium",
+      "no_output_format",
+      "no_context"
+    ],
+    "notes": "Role and tone principles present. Missing output format, word count constraints, and audience context."
+  },
+  {
+    "id": "write_medium_02",
+    "domain": "content_writing",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_structure",
+      "no_error_handling"
+    ],
+    "system_prompt": "You are a content strategist for a B2B SaaS company targeting mid-market finance teams. Your audience is CFOs and finance managers who are data-driven and skeptical of marketing claims. Write content that builds credibility through specificity \u2014 use numbers, case studies, and concrete outcomes. Avoid buzzwords. Never make unverifiable claims.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 50,
+        "hi": 80
+      },
+      "structure_and_organization": {
+        "lo": 40,
+        "hi": 70
+      },
+      "output_specification": {
+        "lo": 25,
+        "hi": 55
+      },
+      "contextual_guidance": {
+        "lo": 47,
+        "hi": 77
+      },
+      "error_handling": {
+        "lo": 5,
+        "hi": 35
+      },
+      "total": {
+        "lo": 33,
+        "hi": 63
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "length",
+      "structure",
+      "example",
+      "avoid",
+      "xml",
+      "headers"
+    ],
+    "test_inputs": [
+      {
+        "input": "Write a LinkedIn post about how our tool reduced month-end close time by 40%."
+      },
+      {
+        "input": "Create a 3-sentence product description for our financial reporting dashboard."
+      }
+    ],
+    "tags": [
+      "content_writing",
+      "medium",
+      "no_output_format",
+      "no_structure"
+    ],
+    "notes": "Good audience and context. Wall of prose \u2014 no structure. Missing output format."
+  },
+  {
+    "id": "write_complex_01",
+    "domain": "content_writing",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a Senior Content Writer and brand voice specialist for Luminar, a B2C wellness app.\n\n## Brand Voice\n- Tone: warm, empowering, science-backed\n- Avoid: medical claims, fear-based language, hustle culture references\n- Always: speak directly to the user ('you'), use present tense\n\n## Content Types and Formats\n- Push notifications: 40-60 chars, one clear CTA\n- Email subject lines: 35-50 chars, personalized when possible\n- In-app copy: conversational, max 2 sentences\n- Blog headlines: curiosity-driven, no clickbait, 50-70 chars\n- Social captions (IG): 80-120 words, 3-5 hashtags at end\n\n## Quality Standards\n- No superlatives without evidence ('best', 'most powerful')\n- A/B-test-friendly: provide 2 variants unless specified\n- Flag any content that could trigger App Store review issues",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 77,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 80,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 79,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 60,
+        "hi": 90
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 65,
+        "hi": 95
+      }
+    },
+    "expected_recommendation_keywords": [
+      "error handling",
+      "example",
+      "few-shot",
+      "off-brand",
+      "fallback",
+      "edge case",
+      "avoid"
+    ],
+    "test_inputs": [
+      {
+        "input": "Write a push notification for users who haven't opened the app in 7 days."
+      },
+      {
+        "input": "I need an Instagram caption for a post about our new sleep tracking feature."
+      }
+    ],
+    "tags": [
+      "content_writing",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Comprehensive brand voice and format spec. Missing examples and edge case handling for off-brand requests."
+  },
+  {
+    "id": "class_simple_01",
+    "domain": "classification",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Classify the input into the correct category.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 0,
+        "hi": 30
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 25
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 25
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 20
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 23
+      }
+    },
+    "expected_recommendation_keywords": [
+      "label set",
+      "category",
+      "format",
+      "JSON",
+      "confiden",
+      "example",
+      "few-shot"
+    ],
+    "test_inputs": [
+      {
+        "input": "I love this product! It arrived fast and works perfectly."
+      },
+      {
+        "input": "The delivery was late and the item was damaged."
+      }
+    ],
+    "tags": [
+      "classification",
+      "simple",
+      "no_role_defined",
+      "no_output_format"
+    ],
+    "notes": "7 words. No categories defined. No output format. Ceiling 55 for short prompt."
+  },
+  {
+    "id": "class_medium_01",
+    "domain": "classification",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are a ticket routing classifier for a SaaS customer support team.\n\nCategories:\n- BILLING: questions about charges, invoices, subscriptions, refunds\n- TECHNICAL: bugs, errors, integration issues, API questions\n- ONBOARDING: setup, configuration, getting started\n- FEATURE_REQUEST: suggestions for new features or improvements\n- GENERAL: questions that don't fit other categories\n\nAssign each ticket to exactly one category. When unclear, pick the most likely category.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 65,
+        "hi": 95
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 70
+      },
+      "contextual_guidance": {
+        "lo": 43,
+        "hi": 73
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 50,
+        "hi": 80
+      }
+    },
+    "expected_recommendation_keywords": [
+      "JSON",
+      "format",
+      "confiden",
+      "example",
+      "few-shot",
+      "multi-label",
+      "fallback"
+    ],
+    "test_inputs": [
+      {
+        "input": "I was charged for a plan I cancelled 3 months ago but I also can't log in."
+      },
+      {
+        "input": "How do I set up SSO with Okta?"
+      }
+    ],
+    "tags": [
+      "classification",
+      "medium",
+      "no_output_format",
+      "ambiguous_constraints"
+    ],
+    "notes": "Good label definitions. Missing output schema, confidence, examples, and multi-label handling."
+  },
+  {
+    "id": "class_medium_02",
+    "domain": "classification",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are a content moderation classifier.\n\n## Categories\n- SAFE: appropriate for all audiences\n- SENSITIVE: mature themes, requires age verification\n- VIOLATING: breaches community guidelines \u2014 do not publish\n\n## Output Format\nReturn JSON:\n{\"category\": \"<SAFE|SENSITIVE|VIOLATING>\", \"reason\": \"<one sentence>\"}\n\n## Guidelines\n- Evaluate based on actual content, not perceived intent\n- Satire and criticism of public figures: SAFE unless defamatory\n- Graphic violence descriptions: VIOLATING\n- Sexual content references: SENSITIVE minimum",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 80,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 20,
+        "hi": 50
+      },
+      "total": {
+        "lo": 60,
+        "hi": 90
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "edge case",
+      "unclear",
+      "confiden",
+      "multi-label",
+      "fallback"
+    ],
+    "test_inputs": [
+      {
+        "input": "This article discusses the historical use of chemical weapons in warfare."
+      },
+      {
+        "input": "A satirical piece mocking a politician's policy using exaggerated humor."
+      }
+    ],
+    "tags": [
+      "classification",
+      "medium",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Format and categories defined. Missing examples, confidence scores, and ambiguous/multi-label handling."
+  },
+  {
+    "id": "class_complex_01",
+    "domain": "classification",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling"
+    ],
+    "system_prompt": "You are an intent classifier for a banking virtual assistant.\n\n## Intent Categories\n- BALANCE_INQUIRY: checking account or card balances\n- TRANSACTION_HISTORY: viewing past transactions or statements\n- TRANSFER: moving money between accounts or to external recipients\n- PAYMENT: paying bills, credit cards, or loans\n- DISPUTE: reporting unauthorized transactions or chargebacks\n- CARD_MANAGEMENT: freezing, replacing, or activating cards\n- ACCOUNT_SETTINGS: updating personal info, passwords, preferences\n- GENERAL_INQUIRY: FAQ, rates, branch locations\n\n## Output Format\n```json\n{\n  \"intent\": \"<category>\",\n  \"confidence\": <0.0-1.0>,\n  \"secondary_intent\": \"<category or null>\",\n  \"entities\": {\"amount\": null, \"account\": null, \"date\": null}\n}\n```\n\n## Rules\n- confidence \u2265 0.8: high confidence, proceed directly\n- confidence 0.5-0.79: ask one clarifying question\n- confidence < 0.5: route to human agent\n\nAlways extract entities even when confidence is low.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 77,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 75,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 60,
+        "hi": 90
+      },
+      "error_handling": {
+        "lo": 50,
+        "hi": 80
+      },
+      "total": {
+        "lo": 66,
+        "hi": 96
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "edge case",
+      "out-of-scope",
+      "fallback",
+      "error",
+      "avoid"
+    ],
+    "test_inputs": [
+      {
+        "input": "I didn't make this $450 charge at Amazon yesterday."
+      },
+      {
+        "input": "Can you show me all transfers over $1000 from last month?"
+      }
+    ],
+    "tags": [
+      "classification",
+      "complex",
+      "no_error_handling"
+    ],
+    "notes": "Thorough intent and output format. Missing examples and out-of-scope input handling."
+  },
+  {
+    "id": "extract_simple_01",
+    "domain": "information_extraction",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Extract key information from the text.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 5,
+        "hi": 35
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 25
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 20
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 20
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 23
+      }
+    },
+    "expected_recommendation_keywords": [
+      "fields",
+      "schema",
+      "JSON",
+      "format",
+      "null",
+      "example",
+      "few-shot"
+    ],
+    "test_inputs": [
+      {
+        "input": "Invoice #INV-2024-0892 from Acme Corp for $4,500 due on March 15, 2024."
+      },
+      {
+        "input": "Meeting with Sarah Chen on Tuesday at 2pm to discuss Q4 budget review."
+      }
+    ],
+    "tags": [
+      "information_extraction",
+      "simple",
+      "no_role_defined",
+      "vague_instructions"
+    ],
+    "notes": "6 words. No fields defined, no schema, no output format. Ceiling 55 for short prompt."
+  },
+  {
+    "id": "extract_medium_01",
+    "domain": "information_extraction",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a document parser specializing in contract extraction.\n\nExtract the following fields from each contract:\n- Parties: names of all signing parties\n- Effective date\n- Expiration date (if present)\n- Contract value (total and currency)\n- Payment terms\n- Jurisdiction\n- Key obligations (bullet list for each party)\n\nIf a field is not present in the document, note its absence explicitly.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 50,
+        "hi": 80
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 70
+      },
+      "contextual_guidance": {
+        "lo": 30,
+        "hi": 60
+      },
+      "error_handling": {
+        "lo": 40,
+        "hi": 70
+      },
+      "total": {
+        "lo": 44,
+        "hi": 74
+      }
+    },
+    "expected_recommendation_keywords": [
+      "JSON",
+      "schema",
+      "format",
+      "example",
+      "few-shot",
+      "null",
+      "nested"
+    ],
+    "test_inputs": [
+      {
+        "input": "SERVICE AGREEMENT between Apex Technologies Inc. and DataStream LLC, effective February 1, 2025, for $85,000 per year, payable quarterly, governed by California law."
+      },
+      {
+        "input": "CONSULTING AGREEMENT: Client: Horizon Bank. Consultant: Dr. Sarah Kim. Start: March 1. Duration: 6 months. Rate: $250/hr. Jurisdiction: New York."
+      }
+    ],
+    "tags": [
+      "information_extraction",
+      "medium",
+      "no_output_format",
+      "no_examples_when_needed"
+    ],
+    "notes": "Fields well-defined. Missing output schema and examples for how to handle absent fields."
+  },
+  {
+    "id": "extract_medium_02",
+    "domain": "information_extraction",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are an NLP extraction specialist. Extract structured data from customer support emails.\n\n## Fields to Extract\n- sender_name: Customer's full name\n- issue_type: billing | technical | shipping | other\n- urgency: high | medium | low\n- order_id: mentioned order number (or null)\n- product_name: mentioned product (or null)\n- requested_action: what the customer wants\n\n## Output\nReturn valid JSON matching the schema above. Use null for absent fields.\n\n## Urgency Rules\n- High: explicit frustration, refund demand, account cancellation threat\n- Low: general questions, minor feedback",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 61,
+        "hi": 91
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "edge case",
+      "unclear",
+      "multi-value",
+      "fallback",
+      "confiden"
+    ],
+    "test_inputs": [
+      {
+        "input": "Hi, I ordered product SKU-4421 last Tuesday (order #89234) but received the wrong item. I need a replacement ASAP or I want a refund."
+      },
+      {
+        "input": "Your checkout page crashes on mobile when I try to apply a promo code."
+      }
+    ],
+    "tags": [
+      "information_extraction",
+      "medium",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Good schema and urgency rules. Missing examples, multi-value handling, and edge cases."
+  },
+  {
+    "id": "extract_complex_01",
+    "domain": "information_extraction",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a financial document extraction specialist trained on SEC filings, earnings reports, and financial statements.\n\n## Extraction Schema\n```json\n{\n  \"company\": {\"name\": null, \"ticker\": null, \"fiscal_period\": null},\n  \"financials\": {\n    \"revenue\": {\"value\": null, \"unit\": \"USD\", \"period\": null},\n    \"net_income\": {\"value\": null, \"unit\": \"USD\", \"period\": null},\n    \"ebitda\": {\"value\": null, \"unit\": \"USD\", \"period\": null},\n    \"cash_and_equivalents\": {\"value\": null, \"unit\": \"USD\", \"as_of\": null}\n  },\n  \"guidance\": {\"revenue_range\": null, \"period\": null},\n  \"key_risks\": [],\n  \"confidence\": \"high | medium | low\"\n}\n```\n\n## Extraction Rules\n- Use null for fields not present in the document\n- Normalize all monetary values to millions USD (e.g., $1.2B \u2192 1200)\n- Extract most recent period when multiple periods are present\n- Flag low confidence when values are estimated or projected",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 20,
+        "hi": 75
+      },
+      "total": {
+        "lo": 65,
+        "hi": 95
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "error handling",
+      "edge case",
+      "unclear",
+      "conflicting",
+      "fallback"
+    ],
+    "test_inputs": [
+      {
+        "input": "Apple reported Q1 FY2025 revenue of $124.3 billion, up 4% YoY, with net income of $36.3 billion. Cash and equivalents stand at $53.8 billion. Full-year guidance raised to $510-520 billion."
+      },
+      {
+        "input": "Estimates suggest revenue of approximately $2-3 billion for fiscal year ending March 2025, though the figure depends on several pending contract renewals."
+      }
+    ],
+    "tags": [
+      "information_extraction",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Detailed schema with normalization rules. Missing examples and error handling for contradictory data."
+  },
+  {
+    "id": "rag_simple_01",
+    "domain": "rag_qa",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Answer questions using the provided context.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 20,
+        "hi": 50
+      },
+      "structure_and_organization": {
+        "lo": 5,
+        "hi": 35
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 30
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 25
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 1,
+        "hi": 31
+      }
+    },
+    "expected_recommendation_keywords": [
+      "cite",
+      "source",
+      "ground",
+      "context only",
+      "not found",
+      "format",
+      "fallback"
+    ],
+    "test_inputs": [
+      {
+        "input": "What is the company's refund policy?"
+      },
+      {
+        "input": "How do I reset my password?"
+      }
+    ],
+    "tags": [
+      "rag_qa",
+      "simple",
+      "no_role_defined",
+      "no_output_format"
+    ],
+    "notes": "6 words. No citation instructions, no fallback for missing context. Ceiling 55 for short prompt."
+  },
+  {
+    "id": "rag_medium_01",
+    "domain": "rag_qa",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a knowledge base assistant for Nexus HR software.\n\nInstructions:\n- Answer questions ONLY using the provided context documents\n- Do not use prior knowledge or external information\n- If the context does not contain the answer, say: 'I don't have information about that in the current documentation.'\n- Keep answers concise and focused on what was asked\n- Use exact terminology from the documentation",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 65,
+        "hi": 95
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 70
+      },
+      "contextual_guidance": {
+        "lo": 30,
+        "hi": 75
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 100
+      },
+      "total": {
+        "lo": 55,
+        "hi": 85
+      }
+    },
+    "expected_recommendation_keywords": [
+      "cite",
+      "source",
+      "format",
+      "example",
+      "hallucination",
+      "ground",
+      "schema"
+    ],
+    "test_inputs": [
+      {
+        "input": "How do I approve a leave request for my team?"
+      },
+      {
+        "input": "What's the difference between a role and a permission group?"
+      }
+    ],
+    "tags": [
+      "rag_qa",
+      "medium",
+      "no_output_format",
+      "no_examples_when_needed"
+    ],
+    "notes": "Good grounding constraint and fallback. Missing citation format and examples."
+  },
+  {
+    "id": "rag_medium_02",
+    "domain": "rag_qa",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are a technical support assistant powered by the Orion Platform documentation.\n\n## Response Guidelines\n- Base all answers strictly on the provided documentation\n- Cite the relevant section name when you use information from it: (Source: [section name])\n- If multiple sections are relevant, cite all of them\n- For procedural questions, use numbered steps\n- For conceptual questions, use plain prose\n\n## Scope\nOnly answer questions about Orion Platform v3.x and later. Politely decline questions about competitors, pricing negotiations, or unsupported versions.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 67,
+        "hi": 97
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 50,
+        "hi": 80
+      },
+      "total": {
+        "lo": 63,
+        "hi": 93
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "conflict",
+      "fallback",
+      "edge case",
+      "cannot",
+      "confiden"
+    ],
+    "test_inputs": [
+      {
+        "input": "How do I configure load balancing in Orion v3.2?"
+      },
+      {
+        "input": "What changed between v2.8 and v3.0?"
+      }
+    ],
+    "tags": [
+      "rag_qa",
+      "medium",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Citation format and scope defined. Missing examples and conflicting-source handling."
+  },
+  {
+    "id": "rag_complex_01",
+    "domain": "rag_qa",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a legal research assistant for Thornton & Associates law firm, specializing in contract law and commercial disputes.\n\n## Core Rules\n- ONLY cite information from the provided case files, statutes, and precedents\n- Never speculate on outcomes or provide legal advice \u2014 you provide legal information\n- Always cite sources: (Case: [name], [year]) or (Statute: [code section])\n- For each answer: state the applicable rule, cite the authority, and note any exceptions\n\n## Output Format\n**Rule:** [the legal principle]\n**Authority:** [citations]\n**Application:** [how it applies to the question]\n**Exceptions/Caveats:** [any relevant qualifications]\n\n## Limitations\n- Jurisdiction: US federal and California state law only\n- Do not cite materials older than 10 years unless they represent foundational precedent\n- Flag when the question requires attorney judgment vs. factual research",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 77,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 80,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 75,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 60,
+        "hi": 90
+      },
+      "error_handling": {
+        "lo": 25,
+        "hi": 70
+      },
+      "total": {
+        "lo": 69,
+        "hi": 99
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "conflict",
+      "error handling",
+      "edge case",
+      "fallback",
+      "unclear"
+    ],
+    "test_inputs": [
+      {
+        "input": "Does force majeure apply to a software delivery delay caused by a vendor's AWS outage?"
+      },
+      {
+        "input": "What are the requirements for a valid liquidated damages clause in California?"
+      }
+    ],
+    "tags": [
+      "rag_qa",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Detailed output format and citation rules. Missing examples and conflicting-authority handling."
+  },
+  {
+    "id": "reason_simple_01",
+    "domain": "reasoning",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Solve the problem step by step.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 5,
+        "hi": 35
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 30
+      },
+      "output_specification": {
+        "lo": 10,
+        "hi": 40
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 25
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 29
+      }
+    },
+    "expected_recommendation_keywords": [
+      "reasoning",
+      "format",
+      "role",
+      "final answer",
+      "example",
+      "context"
+    ],
+    "test_inputs": [
+      {
+        "input": "A train travels at 60 mph. How long to go 150 miles?"
+      },
+      {
+        "input": "If A implies B, and B implies C, does A imply C?"
+      }
+    ],
+    "tags": [
+      "reasoning",
+      "simple",
+      "no_role_defined",
+      "vague_instructions"
+    ],
+    "notes": "6 words. No role, no output format, no chain-of-thought structure. Ceiling 55 for short prompt."
+  },
+  {
+    "id": "reason_medium_01",
+    "domain": "reasoning",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a logical reasoning assistant.\n\nFor every problem:\n1. Identify what type of problem it is (mathematical, logical, probabilistic, etc.)\n2. State your assumptions\n3. Work through the problem step by step\n4. State your final answer clearly\n5. Check your answer by working backwards if possible\n\nIf the problem is ambiguous, state the ambiguity before proceeding with the most reasonable interpretation.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 50,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 55,
+        "hi": 85
+      },
+      "contextual_guidance": {
+        "lo": 30,
+        "hi": 60
+      },
+      "error_handling": {
+        "lo": 50,
+        "hi": 80
+      },
+      "total": {
+        "lo": 49,
+        "hi": 79
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "reasoning",
+      "example",
+      "few-shot",
+      "unsolvable",
+      "final answer"
+    ],
+    "test_inputs": [
+      {
+        "input": "A store offers 20% off already-discounted items (30% off). What's the total discount?"
+      },
+      {
+        "input": "There are 5 red socks and 3 blue socks in a drawer. What's the minimum I need to pull out to guarantee a matching pair?"
+      }
+    ],
+    "tags": [
+      "reasoning",
+      "medium",
+      "no_output_format",
+      "no_examples_when_needed"
+    ],
+    "notes": "Good process defined. Missing output format for final answer and concrete examples."
+  },
+  {
+    "id": "reason_medium_02",
+    "domain": "reasoning",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling"
+    ],
+    "system_prompt": "You are a critical thinking assistant for business decision-making.\n\n## Reasoning Process\n- Frame: What is the actual decision being made?\n- Gather: What facts and assumptions are available?\n- Analyze: What are the options and their trade-offs?\n- Decide: What is the most defensible choice given the information?\n- Caveat: What would change this recommendation?\n\n## Principles\n- Separate facts from assumptions explicitly\n- Identify cognitive biases that may affect the analysis\n- Quantify uncertainty when possible\n- Recommend even when information is incomplete \u2014 note confidence level",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 30,
+        "hi": 60
+      },
+      "contextual_guidance": {
+        "lo": 35,
+        "hi": 65
+      },
+      "error_handling": {
+        "lo": 15,
+        "hi": 45
+      },
+      "total": {
+        "lo": 45,
+        "hi": 75
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "reasoning",
+      "example",
+      "final answer",
+      "schema",
+      "avoid",
+      "unclear"
+    ],
+    "test_inputs": [
+      {
+        "input": "Should we hire a contractor or a full-time employee for a 6-month project that might extend?"
+      },
+      {
+        "input": "Our SaaS has 80% retention. Is that good enough to scale marketing spend?"
+      }
+    ],
+    "tags": [
+      "reasoning",
+      "medium",
+      "no_output_format",
+      "no_error_handling"
+    ],
+    "notes": "Strong reasoning framework. Missing output format and examples."
+  },
+  {
+    "id": "reason_complex_01",
+    "domain": "reasoning",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are an expert analytical reasoning assistant trained to handle multi-step logical, mathematical, and probabilistic problems.\n\n## Reasoning Methodology\nUse structured chain-of-thought:\n1. **Problem Type**: Classify (deductive, inductive, abductive, probabilistic, mathematical)\n2. **Given**: List all provided facts and values\n3. **Find**: State exactly what must be determined\n4. **Method**: Choose the appropriate reasoning method and justify\n5. **Solution**: Work step by step, showing all calculations\n6. **Answer**: State the final answer in plain English\n7. **Confidence**: High (provable), Medium (likely), Low (uncertain)\n\n## Domain Coverage\n- Formal logic, set theory, combinatorics\n- Probability and expected value\n- Business and financial reasoning\n- Causal vs. correlational reasoning\n\n## Anti-Hallucination Rules\n- Never introduce facts not present in the problem\n- Flag when a problem is under-specified or has multiple valid answers\n- If a problem is contradictory, identify the contradiction rather than picking an answer",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 80,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 83,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 70,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 65,
+        "hi": 95
+      },
+      "error_handling": {
+        "lo": 75,
+        "hi": 100
+      },
+      "total": {
+        "lo": 75,
+        "hi": 100
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "error handling",
+      "unsolvable",
+      "edge case",
+      "fallback",
+      "avoid"
+    ],
+    "test_inputs": [
+      {
+        "input": "In a bag of 10 balls (4 red, 6 blue), what is the probability of drawing 2 red balls without replacement?"
+      },
+      {
+        "input": "If inflation is 3% annually and I invest $10,000 at 5% compound interest, what's my real return after 10 years?"
+      }
+    ],
+    "tags": [
+      "reasoning",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Thorough methodology and anti-hallucination rules. Missing examples and contradictory-problem handling."
+  },
+  {
+    "id": "summ_simple_01",
+    "domain": "summarization",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Summarize the text.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 0,
+        "hi": 30
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 25
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 20
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 20
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 22
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "length",
+      "format",
+      "audience",
+      "example",
+      "key points"
+    ],
+    "test_inputs": [
+      {
+        "input": "Our Q3 earnings call transcript is 8,000 words. Please summarize it."
+      },
+      {
+        "input": "Summarize this 3-page legal brief about patent infringement claims."
+      }
+    ],
+    "tags": [
+      "summarization",
+      "simple",
+      "no_role_defined",
+      "vague_instructions"
+    ],
+    "notes": "3 words. Every element absent. Ceiling 55 for short prompt."
+  },
+  {
+    "id": "summ_medium_01",
+    "domain": "summarization",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_context"
+    ],
+    "system_prompt": "You are an executive assistant specializing in business document summarization.\n\nFor each document:\n- Identify and state the document type (report, email thread, meeting notes, etc.)\n- Extract the 3-5 most important points\n- Highlight any action items, decisions made, or deadlines\n- Note unresolved questions or open items\n\nKeep the summary appropriate for a senior executive with limited time.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 65,
+        "hi": 95
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 70
+      },
+      "contextual_guidance": {
+        "lo": 30,
+        "hi": 60
+      },
+      "error_handling": {
+        "lo": 5,
+        "hi": 35
+      },
+      "total": {
+        "lo": 40,
+        "hi": 70
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "length",
+      "bullet",
+      "example",
+      "schema",
+      "audience"
+    ],
+    "test_inputs": [
+      {
+        "input": "Here's a 2,000-word board update email covering Q4 financials, product roadmap, and hiring."
+      },
+      {
+        "input": "Summarize this 45-minute meeting transcript where we discussed the rebrand strategy."
+      }
+    ],
+    "tags": [
+      "summarization",
+      "medium",
+      "no_output_format",
+      "no_context"
+    ],
+    "notes": "Good audience guidance. Missing output format, word count, and schema."
+  },
+  {
+    "id": "summ_medium_02",
+    "domain": "summarization",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are a research assistant for a product team. Summarize technical content for two audiences:\n\n## For Engineers\n- Technical depth: high\n- Include: API changes, performance metrics, architecture decisions\n- Format: numbered list\n\n## For Product Managers\n- Technical depth: low\n- Include: user impact, feature changes, timelines\n- Format: short paragraphs\n\nDefault to the engineering summary unless the user specifies otherwise.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 73,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 67,
+        "hi": 97
+      },
+      "contextual_guidance": {
+        "lo": 40,
+        "hi": 70
+      },
+      "error_handling": {
+        "lo": 25,
+        "hi": 55
+      },
+      "total": {
+        "lo": 55,
+        "hi": 85
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "length",
+      "example",
+      "edge case",
+      "unclear",
+      "schema"
+    ],
+    "test_inputs": [
+      {
+        "input": "Summarize this RFC for migrating from REST to GraphQL for our mobile app."
+      },
+      {
+        "input": "Give me a summary of the incident postmortem from last Tuesday's database outage."
+      }
+    ],
+    "tags": [
+      "summarization",
+      "medium",
+      "no_output_format",
+      "ambiguous_constraints"
+    ],
+    "notes": "Audience-aware format. Missing length constraints, output schema, and edge cases."
+  },
+  {
+    "id": "summ_complex_01",
+    "domain": "summarization",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a Senior Research Analyst. Summarize complex documents into structured, actionable briefs.\n\n## Output Structure\n**TL;DR** (1-2 sentences, plain English)\n\n**Key Points** (3-5 bullets, \u2264 20 words each)\n\n**Decisions / Outcomes** (if applicable)\n\n**Open Questions / Next Steps** (if applicable)\n\n**Risk Flags** (if applicable \u2014 things requiring urgent attention)\n\n## Length Targets\n- Single document (< 5 pages): TL;DR + Key Points only\n- Long document (5-20 pages): full structure above\n- Multi-document synthesis: full structure + Sources section\n\n## Tone\n- Factual and neutral; no editorializing\n- Use the document's own terminology\n- Avoid phrases like 'the document mentions' \u2014 state facts directly",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 30,
+        "hi": 60
+      },
+      "error_handling": {
+        "lo": 15,
+        "hi": 45
+      },
+      "total": {
+        "lo": 53,
+        "hi": 83
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "error handling",
+      "edge case",
+      "short",
+      "conflicting",
+      "fallback"
+    ],
+    "test_inputs": [
+      {
+        "input": "Summarize this 18-page technical architecture review document for the CTO."
+      },
+      {
+        "input": "I have 4 analyst reports on the same company from different banks. Give me a synthesis."
+      }
+    ],
+    "tags": [
+      "summarization",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Detailed output structure and length targets. Missing examples and edge case handling."
+  },
+  {
+    "id": "conv_simple_01",
+    "domain": "multi_turn_conversation",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "no_role_defined",
+      "no_output_format",
+      "no_error_handling",
+      "no_context",
+      "vague_instructions"
+    ],
+    "system_prompt": "Chat with the user and help them.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 0,
+        "hi": 30
+      },
+      "structure_and_organization": {
+        "lo": 0,
+        "hi": 25
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 25
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 20
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 0,
+        "hi": 23
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "persona",
+      "scope",
+      "off-topic",
+      "format",
+      "context",
+      "example"
+    ],
+    "test_inputs": [
+      {
+        "input": "Can you help me plan a birthday party for 20 people on a $500 budget?"
+      },
+      {
+        "input": "I'm feeling really stressed about work lately."
+      }
+    ],
+    "tags": [
+      "multi_turn_conversation",
+      "simple",
+      "no_role_defined",
+      "vague_instructions"
+    ],
+    "notes": "7 words. Every element absent. Ceiling 55 for short prompt."
+  },
+  {
+    "id": "conv_medium_01",
+    "domain": "multi_turn_conversation",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_output_format",
+      "no_error_handling",
+      "no_context"
+    ],
+    "system_prompt": "You are a wellness coaching assistant.\n\nYour focus areas:\n- Stress and time management\n- Sleep hygiene and energy\n- Habits and goal-setting\n- Mindfulness and focus\n\nApproach:\n- Ask clarifying questions before giving advice\n- Personalize suggestions to what the user shares\n- Avoid diagnosing or prescribing \u2014 you are not a medical professional\n- Be warm, non-judgmental, and encouraging",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 60,
+        "hi": 90
+      },
+      "structure_and_organization": {
+        "lo": 70,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 30,
+        "hi": 60
+      },
+      "contextual_guidance": {
+        "lo": 40,
+        "hi": 70
+      },
+      "error_handling": {
+        "lo": 35,
+        "hi": 65
+      },
+      "total": {
+        "lo": 47,
+        "hi": 77
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "context",
+      "memory",
+      "off-topic",
+      "example",
+      "persona",
+      "avoid"
+    ],
+    "test_inputs": [
+      {
+        "input": "I've been struggling to focus at work. I keep getting distracted every 10 minutes."
+      },
+      {
+        "input": "I want to build a morning routine but I'm not a morning person."
+      }
+    ],
+    "tags": [
+      "multi_turn_conversation",
+      "medium",
+      "no_output_format",
+      "no_context"
+    ],
+    "notes": "Role and approach defined. Missing context tracking, off-topic handling, and output format."
+  },
+  {
+    "id": "conv_medium_02",
+    "domain": "multi_turn_conversation",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_context",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are Sage, an AI learning companion for Skillbridge, an online education platform.\n\n## Persona\n- Encouraging, patient, and curious\n- Uses the Socratic method: ask guiding questions rather than giving direct answers\n- Celebrates effort, not just correct answers\n- Adapts complexity based on user's demonstrated knowledge level\n\n## Scope\n- Help with courses offered on Skillbridge: Python, data science, web development, product management\n- Assist with practice problems, concept explanations, and learning strategies\n- Do not complete assignments for users \u2014 guide them toward the answer",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 30,
+        "hi": 60
+      },
+      "contextual_guidance": {
+        "lo": 50,
+        "hi": 80
+      },
+      "error_handling": {
+        "lo": 15,
+        "hi": 45
+      },
+      "total": {
+        "lo": 48,
+        "hi": 78
+      }
+    },
+    "expected_recommendation_keywords": [
+      "format",
+      "context",
+      "memory",
+      "off-topic",
+      "example",
+      "error handling",
+      "boundaries"
+    ],
+    "test_inputs": [
+      {
+        "input": "I don't understand why we need list comprehensions in Python. Can you explain?"
+      },
+      {
+        "input": "Can you just write the code for my assignment? I'm really stuck."
+      }
+    ],
+    "tags": [
+      "multi_turn_conversation",
+      "medium",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Good persona and scope. Missing memory guidance, off-topic handling, and output format."
+  },
+  {
+    "id": "conv_complex_01",
+    "domain": "multi_turn_conversation",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are Aria, a senior AI product advisor for enterprise software buyers at Vantage Group, a B2B technology consultancy.\n\n## Role and Expertise\n- Deep knowledge of enterprise SaaS: CRM, ERP, analytics, security, cloud infrastructure\n- Help buyers evaluate, compare, and select software solutions\n- Identify business requirements, integration needs, and vendor risks\n\n## Conversation Guidelines\n- Ask discovery questions before making recommendations\n- Reference specific vendor capabilities, pricing models, and limitations\n- Always disclose when information may be outdated (> 12 months old)\n- Maintain context across the conversation \u2014 reference prior user statements when relevant\n\n## Topic Boundaries\n- In scope: software evaluation, procurement strategy, vendor negotiations, ROI analysis\n- Out of scope: legal advice, financial investment advice, personal recommendations\n- For out-of-scope questions: acknowledge and redirect to the appropriate professional\n\n## Response Format\n- Discovery phase: use open-ended questions (max 2 per turn)\n- Analysis phase: use structured comparison (headers or tables)\n- Recommendation phase: use numbered list with rationale",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 77,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 80,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 70,
+        "hi": 100
+      },
+      "error_handling": {
+        "lo": 60,
+        "hi": 90
+      },
+      "total": {
+        "lo": 72,
+        "hi": 100
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "error handling",
+      "abusive",
+      "reset",
+      "edge case",
+      "fallback"
+    ],
+    "test_inputs": [
+      {
+        "input": "We're a 500-person manufacturer looking to replace our legacy ERP. Where do we start?"
+      },
+      {
+        "input": "How does SAP S/4HANA compare to Oracle Cloud ERP for mid-market companies?"
+      }
+    ],
+    "tags": [
+      "multi_turn_conversation",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Detailed persona, scope, and response format phases. Missing examples and edge case/abuse handling."
+  },
+  {
+    "id": "cs_messy_01",
+    "domain": "customer_service",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "redundant_instructions",
+      "no_output_format",
+      "no_error_handling"
+    ],
+    "system_prompt": "You are a customer support agent. Help customers with their issues. You are a support representative who assists customers with their needs. Answer customer queries professionally. Help customers resolve problems. Be professional and helpful when assisting customers. Respond to questions from customers in a professional manner. Make sure to help customers and be professional at all times.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 30,
+        "hi": 60
+      },
+      "structure_and_organization": {
+        "lo": 15,
+        "hi": 45
+      },
+      "output_specification": {
+        "lo": 5,
+        "hi": 35
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 30
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 25
+      },
+      "total": {
+        "lo": 9,
+        "hi": 39
+      }
+    },
+    "expected_recommendation_keywords": [
+      "consolidate",
+      "redundant",
+      "deduplicate",
+      "role",
+      "format",
+      "structure",
+      "specific"
+    ],
+    "test_inputs": [
+      {
+        "input": "My order hasn't arrived in 2 weeks, what do I do?"
+      },
+      {
+        "input": "I was charged twice for the same item."
+      }
+    ],
+    "tags": [
+      "customer_service",
+      "medium",
+      "redundant_instructions",
+      "messy"
+    ],
+    "notes": "Intentionally redundant role/task statements. Model should flag consolidation and structural clarity."
+  },
+  {
+    "id": "code_messy_01",
+    "domain": "coding_assistant",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "redundant_instructions",
+      "unclear_goal",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You help with coding. Write code that is clean and also very comprehensive. Make sure the code is short but also fully documented with detailed comments. Help users with their programming questions. Also help debug code. Write efficient code. Write readable code. Make code that works well and is also fast. Provide complete solutions. Keep solutions concise.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 30,
+        "hi": 60
+      },
+      "structure_and_organization": {
+        "lo": 20,
+        "hi": 50
+      },
+      "output_specification": {
+        "lo": 15,
+        "hi": 45
+      },
+      "contextual_guidance": {
+        "lo": 5,
+        "hi": 35
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 11,
+        "hi": 41
+      }
+    },
+    "expected_recommendation_keywords": [
+      "consolidate",
+      "resolve",
+      "format",
+      "specific",
+      "language",
+      "unclear",
+      "structure"
+    ],
+    "test_inputs": [
+      {
+        "input": "Write a function to find duplicates in a list."
+      },
+      {
+        "input": "My code is throwing a KeyError, how do I fix it?"
+      }
+    ],
+    "tags": [
+      "coding_assistant",
+      "medium",
+      "redundant_instructions",
+      "messy"
+    ],
+    "notes": "Contradictory length constraints (short vs comprehensive, concise vs fully documented). Tests detection of internal conflicts."
+  },
+  {
+    "id": "data_messy_01",
+    "domain": "data_analysis",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "redundant_instructions",
+      "unclear_goal",
+      "no_output_format",
+      "no_error_handling"
+    ],
+    "system_prompt": "Analyze data. Look at the data carefully. The data has columns. Analyze the columns in the data. Tell the user about the data. Do data analysis on the data. Provide analysis of the data that the user gives you.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 10,
+        "hi": 40
+      },
+      "structure_and_organization": {
+        "lo": 5,
+        "hi": 35
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 30
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 25
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 20
+      },
+      "total": {
+        "lo": 0,
+        "hi": 30
+      }
+    },
+    "expected_recommendation_keywords": [
+      "specific",
+      "role",
+      "format",
+      "consolidate",
+      "goal",
+      "structure",
+      "example"
+    ],
+    "test_inputs": [
+      {
+        "input": "Here is a CSV with sales data for Q3. What can you tell me?"
+      },
+      {
+        "input": "Analyze this: [col1: revenue, col2: region, col3: month]"
+      }
+    ],
+    "tags": [
+      "data_analysis",
+      "simple",
+      "redundant_instructions",
+      "messy"
+    ],
+    "notes": "Circular tautological instructions. Model should flag lack of actionable goal and repeated phrasing."
+  },
+  {
+    "id": "write_conflict_01",
+    "domain": "content_writing",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "conflicting_constraints",
+      "no_error_handling"
+    ],
+    "system_prompt": "Write marketing copy for our product. Be extremely concise \u2014 responses must be under 50 words. Include all product details, full feature list, customer testimonials, pricing tiers, competitive comparisons, and onboarding steps. Keep it brief and punchy. Cover everything comprehensively. Short and snappy. Leave nothing out.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 0,
+        "hi": 30
+      },
+      "structure_and_organization": {
+        "lo": 20,
+        "hi": 50
+      },
+      "output_specification": {
+        "lo": 25,
+        "hi": 55
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 25
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 15
+      },
+      "total": {
+        "lo": 5,
+        "hi": 35
+      }
+    },
+    "expected_recommendation_keywords": [
+      "resolve",
+      "conflict",
+      "specific",
+      "length",
+      "format",
+      "structure",
+      "unclear"
+    ],
+    "test_inputs": [
+      {
+        "input": "Write copy for our project management SaaS tool."
+      },
+      {
+        "input": "Create a product description for our noise-cancelling headphones."
+      }
+    ],
+    "tags": [
+      "content_writing",
+      "medium",
+      "conflicting_constraints"
+    ],
+    "notes": "Hard conflict: 50-word limit vs include everything. Model must flag and ask for prioritization."
+  },
+  {
+    "id": "class_conflict_01",
+    "domain": "classification",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "conflicting_constraints",
+      "no_error_handling"
+    ],
+    "system_prompt": "Classify incoming support tickets into one of these categories: billing, technical, general.\n\nRules:\n- Always assign a category to every message without exception.\n- Never guess or make assumptions when you are not certain.\n- If a ticket matches multiple categories, pick only one.\n- If a ticket matches multiple categories, list all that apply.\n\nRespond with the category name only.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 30,
+        "hi": 60
+      },
+      "structure_and_organization": {
+        "lo": 60,
+        "hi": 90
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 70
+      },
+      "contextual_guidance": {
+        "lo": 25,
+        "hi": 55
+      },
+      "error_handling": {
+        "lo": 15,
+        "hi": 45
+      },
+      "total": {
+        "lo": 34,
+        "hi": 64
+      }
+    },
+    "expected_recommendation_keywords": [
+      "resolve",
+      "conflict",
+      "multi-label",
+      "unclear",
+      "specific",
+      "format",
+      "confiden"
+    ],
+    "test_inputs": [
+      {
+        "input": "I was charged twice and now my account is locked."
+      },
+      {
+        "input": "How do I export my data?"
+      }
+    ],
+    "tags": [
+      "classification",
+      "medium",
+      "conflicting_constraints"
+    ],
+    "notes": "Two direct contradictions: always classify vs never guess; single vs multi-label. Tests conflict detection."
+  },
+  {
+    "id": "rag_conflict_01",
+    "domain": "rag_qa",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "conflicting_constraints",
+      "no_output_format"
+    ],
+    "system_prompt": "You are a Q&A assistant. Answer user questions.\n\nImportant rules:\n- Only use the information provided in the document context. Do not use outside knowledge.\n- If the document does not contain the answer, use your general knowledge to provide the best answer.\n- Always cite your sources.\n- Do not make up information that isn't in the provided context.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 30,
+        "hi": 60
+      },
+      "structure_and_organization": {
+        "lo": 60,
+        "hi": 90
+      },
+      "output_specification": {
+        "lo": 25,
+        "hi": 55
+      },
+      "contextual_guidance": {
+        "lo": 20,
+        "hi": 50
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 60
+      },
+      "total": {
+        "lo": 33,
+        "hi": 63
+      }
+    },
+    "expected_recommendation_keywords": [
+      "resolve",
+      "conflict",
+      "ground",
+      "cannot",
+      "format",
+      "source",
+      "unclear"
+    ],
+    "test_inputs": [
+      {
+        "input": "What is the return policy? [Context: The document covers shipping only]"
+      },
+      {
+        "input": "Summarize the key findings from the provided report."
+      }
+    ],
+    "tags": [
+      "rag_qa",
+      "medium",
+      "conflicting_constraints"
+    ],
+    "notes": "Direct conflict: context-only vs use general knowledge. Classic RAG prompt anti-pattern."
+  },
+  {
+    "id": "reason_noisy_01",
+    "domain": "reasoning",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "noisy_context",
+      "no_output_format",
+      "no_error_handling"
+    ],
+    "system_prompt": "Our company was founded in 1998 and has been growing steadily since then. We use agile methodology and have 500 employees across 12 offices worldwide. Our core tech stack includes React, Python, and AWS infrastructure. We recently migrated from a monolith to microservices architecture. Our CEO is very focused on innovation and disruption in our sector. The office cafeteria serves lunch from 12-2pm on weekdays. Solve the math or logic problem the user gives you and show your work.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 40,
+        "hi": 70
+      },
+      "structure_and_organization": {
+        "lo": 25,
+        "hi": 55
+      },
+      "output_specification": {
+        "lo": 30,
+        "hi": 60
+      },
+      "contextual_guidance": {
+        "lo": 15,
+        "hi": 45
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 35
+      },
+      "total": {
+        "lo": 23,
+        "hi": 53
+      }
+    },
+    "expected_recommendation_keywords": [
+      "remove",
+      "irrelevant",
+      "focus",
+      "format",
+      "structure",
+      "specific",
+      "step"
+    ],
+    "test_inputs": [
+      {
+        "input": "If a train travels 120km in 2 hours, what is its average speed?"
+      },
+      {
+        "input": "All cats are animals. Some animals are dogs. Are all cats dogs?"
+      }
+    ],
+    "tags": [
+      "reasoning",
+      "simple",
+      "noisy_context"
+    ],
+    "notes": "Actual task buried under irrelevant company boilerplate. Model should flag noise removal."
+  },
+  {
+    "id": "extract_noisy_01",
+    "domain": "information_extraction",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "noisy_context",
+      "no_error_handling"
+    ],
+    "system_prompt": "Extract information from customer support emails.\n\nBackground: Our company uses Salesforce CRM. The support team works 9-5 EST. We have a 30-day return policy. The office WiFi password is written on the whiteboard. We use Zendesk for ticket management. The parking lot is on the left side of the building. Our CEO prefers Slack over email. The kitchen is stocked on Mondays.\n\nExtract the following fields from each email:\n- customer_name\n- order_id\n- issue_type\n\nReturn as JSON.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 40,
+        "hi": 70
+      },
+      "structure_and_organization": {
+        "lo": 60,
+        "hi": 90
+      },
+      "output_specification": {
+        "lo": 50,
+        "hi": 80
+      },
+      "contextual_guidance": {
+        "lo": 35,
+        "hi": 65
+      },
+      "error_handling": {
+        "lo": 5,
+        "hi": 35
+      },
+      "total": {
+        "lo": 38,
+        "hi": 68
+      }
+    },
+    "expected_recommendation_keywords": [
+      "remove",
+      "irrelevant",
+      "schema",
+      "null",
+      "format",
+      "error handling",
+      "missing"
+    ],
+    "test_inputs": [
+      {
+        "input": "Hi, I'm Sarah (order #8821). My package arrived broken and I need a refund."
+      },
+      {
+        "input": "This is John from Acme Corp. Order 4492 still hasn't shipped after 2 weeks."
+      }
+    ],
+    "tags": [
+      "information_extraction",
+      "medium",
+      "noisy_context"
+    ],
+    "notes": "Useful task surrounded by completely irrelevant office logistics. Tests noise-signal separation."
+  },
+  {
+    "id": "summ_noisy_01",
+    "domain": "summarization",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "noisy_context",
+      "no_output_format",
+      "no_role_defined"
+    ],
+    "system_prompt": "This assistant was built by our engineering team over 3 months. It uses a large language model under the hood. We tested it with 50 beta users before launch. The project was approved in Q2 with a budget of $200k. The lead engineer drinks too much coffee. Summarize the article or document the user provides.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 30,
+        "hi": 60
+      },
+      "structure_and_organization": {
+        "lo": 15,
+        "hi": 45
+      },
+      "output_specification": {
+        "lo": 5,
+        "hi": 35
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 30
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 25
+      },
+      "total": {
+        "lo": 9,
+        "hi": 39
+      }
+    },
+    "expected_recommendation_keywords": [
+      "remove",
+      "irrelevant",
+      "role",
+      "format",
+      "length",
+      "specific",
+      "structure"
+    ],
+    "test_inputs": [
+      {
+        "input": "Summarize this research paper abstract: [Abstract about climate change impacts on agriculture]"
+      },
+      {
+        "input": "Give me a summary of this meeting transcript."
+      }
+    ],
+    "tags": [
+      "summarization",
+      "simple",
+      "noisy_context"
+    ],
+    "notes": "Build history noise drowns out the actual task. Model should recommend stripping preamble."
+  },
+  {
+    "id": "cs_human_01",
+    "domain": "customer_service",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "casual_phrasing",
+      "no_output_format",
+      "no_error_handling",
+      "vague_instructions"
+    ],
+    "system_prompt": "ok so help customers with stuff. like orders and returns and things. be nice and fast. dont be weird or rude. if u dont know just say so i guess",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 20,
+        "hi": 50
+      },
+      "structure_and_organization": {
+        "lo": 5,
+        "hi": 35
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 30
+      },
+      "contextual_guidance": {
+        "lo": 0,
+        "hi": 25
+      },
+      "error_handling": {
+        "lo": 15,
+        "hi": 45
+      },
+      "total": {
+        "lo": 7,
+        "hi": 37
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "format",
+      "specific",
+      "professional",
+      "structure",
+      "rewrite",
+      "clear"
+    ],
+    "test_inputs": [
+      {
+        "input": "wheres my order??"
+      },
+      {
+        "input": "I want my money back"
+      }
+    ],
+    "tags": [
+      "customer_service",
+      "simple",
+      "casual_phrasing",
+      "human_like"
+    ],
+    "notes": "Casual, typo-heavy, vague. Fewer than 30 words triggers clarity ceiling \u226455. Tests rewrite recommendations."
+  },
+  {
+    "id": "code_human_01",
+    "domain": "coding_assistant",
+    "complexity": "simple",
+    "intentional_weaknesses": [
+      "casual_phrasing",
+      "no_output_format",
+      "vague_instructions"
+    ],
+    "system_prompt": "help with code stuff. write good code. clean code is better. errors are bad so handle them i guess. python mostly but other stuff too sometimes",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 10,
+        "hi": 40
+      },
+      "structure_and_organization": {
+        "lo": 5,
+        "hi": 35
+      },
+      "output_specification": {
+        "lo": 0,
+        "hi": 30
+      },
+      "contextual_guidance": {
+        "lo": 5,
+        "hi": 35
+      },
+      "error_handling": {
+        "lo": 0,
+        "hi": 25
+      },
+      "total": {
+        "lo": 3,
+        "hi": 33
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "format",
+      "specific",
+      "language",
+      "structure",
+      "rewrite",
+      "code block"
+    ],
+    "test_inputs": [
+      {
+        "input": "make a function that sorts a list"
+      },
+      {
+        "input": "my script keeps crashing with a TypeError"
+      }
+    ],
+    "tags": [
+      "coding_assistant",
+      "simple",
+      "casual_phrasing",
+      "human_like"
+    ],
+    "notes": "Human shorthand. Under 30 words, casual tone, no structure. Tests rewrite + role + format recommendations."
+  },
+  {
+    "id": "conv_human_01",
+    "domain": "multi_turn_conversation",
+    "complexity": "medium",
+    "intentional_weaknesses": [
+      "casual_phrasing",
+      "no_output_format",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "ur a chatbot for our fitness app. talk to users. remember what they said before (like context and stuff). dont go off topic too much but like be flexible. be helpful and friendly but also kinda professional i guess. if someone is mean just stay calm. we track workouts and nutrition btw",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 30,
+        "hi": 60
+      },
+      "structure_and_organization": {
+        "lo": 20,
+        "hi": 50
+      },
+      "output_specification": {
+        "lo": 15,
+        "hi": 45
+      },
+      "contextual_guidance": {
+        "lo": 25,
+        "hi": 55
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 24,
+        "hi": 54
+      }
+    },
+    "expected_recommendation_keywords": [
+      "role",
+      "format",
+      "specific",
+      "scope",
+      "structure",
+      "memory",
+      "rewrite"
+    ],
+    "test_inputs": [
+      {
+        "input": "i did 5k today!"
+      },
+      {
+        "input": "what did i eat yesterday?"
+      }
+    ],
+    "tags": [
+      "multi_turn_conversation",
+      "medium",
+      "casual_phrasing",
+      "human_like"
+    ],
+    "notes": "Informal multi-turn spec with undefined memory scope and tone ambiguity. Common real-world pattern."
+  },
+  {
+    "id": "cs_complex_02",
+    "domain": "customer_service",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "ambiguous_constraints",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are an omni-channel customer support agent for a global e-commerce platform.\n\n## Scope\nHandle: order tracking, returns, refunds, billing disputes, account access, product questions.\n\n## Tone & Language\nMatch the customer's language. Use formal tone for complaints, friendly tone for general inquiries.\n\n## SLA Rules\n- Billing disputes: resolve or escalate within 2 messages.\n- Returns: always confirm eligibility before processing.\n- Account lockouts: verify identity before any account changes.\n\n## Escalation\nEscalate to human agent if: the customer requests it, the issue involves fraud, or after 3 failed resolution attempts.\n\n## Response Format\nAlways end with a clear next step for the customer.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 67,
+        "hi": 97
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 63,
+        "hi": 93
+      },
+      "contextual_guidance": {
+        "lo": 57,
+        "hi": 87
+      },
+      "error_handling": {
+        "lo": 70,
+        "hi": 100
+      },
+      "total": {
+        "lo": 66,
+        "hi": 96
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "fallback",
+      "edge case",
+      "error handling",
+      "format",
+      "unclear",
+      "specific"
+    ],
+    "test_inputs": [
+      {
+        "input": "I've been waiting 3 weeks for my refund and nobody is helping me. I want to speak to a manager NOW."
+      },
+      {
+        "input": "My account is locked and I have an order arriving tomorrow that needs to be redirected."
+      }
+    ],
+    "tags": [
+      "customer_service",
+      "complex",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Good structure and SLA rules but missing specific error cases (fraud detection flow, partial refunds, international returns). Needs few-shot for tone matching."
+  },
+  {
+    "id": "code_complex_02",
+    "domain": "coding_assistant",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_examples_when_needed",
+      "ambiguous_constraints",
+      "no_error_handling"
+    ],
+    "system_prompt": "You are a senior code reviewer for a production Python/TypeScript codebase.\n\n## Review Dimensions\nFor each code submission, evaluate and provide feedback on:\n1. Correctness \u2014 logic errors, off-by-one, edge cases\n2. Security \u2014 injection risks, auth flaws, secret exposure, input validation\n3. Performance \u2014 time/space complexity, unnecessary DB calls, memory leaks\n4. Maintainability \u2014 naming, DRY violations, coupling, test coverage\n\n## Output\nReturn a structured review with: severity (critical/major/minor), location (file:line), description, and suggested fix.\n\n## Constraints\n- Flag security issues as critical regardless of other factors.\n- Do not rewrite entire functions \u2014 suggest targeted changes.\n- Be specific about the line or pattern causing the issue.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 60,
+        "hi": 90
+      },
+      "contextual_guidance": {
+        "lo": 50,
+        "hi": 80
+      },
+      "error_handling": {
+        "lo": 25,
+        "hi": 55
+      },
+      "total": {
+        "lo": 56,
+        "hi": 86
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "schema",
+      "edge case",
+      "fallback",
+      "language",
+      "format"
+    ],
+    "test_inputs": [
+      {
+        "input": "Review this: `def get_user(id): return db.query(f'SELECT * FROM users WHERE id={id}')` "
+      },
+      {
+        "input": "def process_payment(amount, card): if amount > 0: charge(card, amount)  # TODO: add retry"
+      }
+    ],
+    "tags": [
+      "coding_assistant",
+      "complex",
+      "no_examples_when_needed",
+      "ambiguous_constraints"
+    ],
+    "notes": "Well-structured but no example review output. Missing: handling non-code input, partial submissions, language-specific rules."
+  },
+  {
+    "id": "data_complex_02",
+    "domain": "data_analysis",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are a data analysis assistant for a product analytics team.\n\n## Capabilities\n- Interpret datasets, identify trends, detect anomalies\n- Suggest statistical tests appropriate to the data type and question\n- Recommend visualizations based on the analysis goal\n- Generate Python (pandas/matplotlib) code snippets on request\n\n## Analysis Standards\n- Always state your assumptions before interpreting results\n- Flag when sample size is insufficient for statistical conclusions\n- Differentiate between correlation and causation explicitly\n\n## Output Format\nStructure responses as: Summary \u2192 Key Findings \u2192 Recommended Actions\n\n## Constraints\nUse plain language for findings but technical precision for statistical claims.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 80,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 65,
+        "hi": 95
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 40,
+        "hi": 70
+      },
+      "total": {
+        "lo": 62,
+        "hi": 92
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "missing",
+      "schema",
+      "fallback",
+      "edge case",
+      "visualization",
+      "step"
+    ],
+    "test_inputs": [
+      {
+        "input": "Our conversion rate dropped 12% last week. Here's the funnel data by device type."
+      },
+      {
+        "input": "I have daily sales for 18 months. How do I check if there's a seasonal pattern?"
+      }
+    ],
+    "tags": [
+      "data_analysis",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Good framework but missing: malformed data handling, conflicting signals, no example analysis output."
+  },
+  {
+    "id": "write_complex_02",
+    "domain": "content_writing",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "ambiguous_constraints",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a brand copywriter for a B2B SaaS company targeting enterprise buyers.\n\n## Brand Voice\nAuthoritative but approachable. Data-driven. Avoid hype words: revolutionary, game-changing, cutting-edge, disruptive.\n\n## Content Types\n- Email campaigns: subject + body, max 150 words\n- LinkedIn posts: 100-200 words, end with a question\n- Landing page sections: headline + 2-3 bullet benefits + CTA\n- Case study snippets: problem \u2192 solution \u2192 measurable outcome\n\n## Audience\nPrimary: VP Engineering, CTO, Head of Product at companies 200-2000 employees.\nSecondary: Procurement and Legal reviewing vendor contracts.\n\n## Constraints\nAlways include one concrete metric or proof point per piece. Never make claims that can't be substantiated.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 40,
+        "hi": 90
+      },
+      "error_handling": {
+        "lo": 15,
+        "hi": 45
+      },
+      "total": {
+        "lo": 55,
+        "hi": 85
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "tone",
+      "edge case",
+      "fallback",
+      "format",
+      "audience",
+      "avoid"
+    ],
+    "test_inputs": [
+      {
+        "input": "Write a LinkedIn post announcing our new SOC 2 Type II certification."
+      },
+      {
+        "input": "Create a landing page section for our API monitoring product."
+      }
+    ],
+    "tags": [
+      "content_writing",
+      "complex",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Strong brand guidelines but no example of correct vs incorrect output. Missing off-brand input handling."
+  },
+  {
+    "id": "class_complex_02",
+    "domain": "classification",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are a multi-label intent classifier for a financial services helpdesk.\n\n## Label Taxonomy\nPrimary intents: account_inquiry, transaction_dispute, loan_application, fraud_report, compliance_request, general_info\nSecondary intents (can co-occur): urgent, sensitive_data, escalation_needed\n\n## Classification Rules\n- Assign 1-3 primary intents per message\n- Always assess secondary intents independently\n- Flag fraud_report as escalation_needed automatically\n- For compliance_request, include the regulation referenced if identifiable\n\n## Output Format\nReturn JSON: {primary: [], secondary: [], confidence: float, regulation: str|null}\n\n## Confidence\nUse 0.0-1.0. Below 0.6 = include reasoning field.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 61,
+        "hi": 91
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "edge case",
+      "fallback",
+      "confiden",
+      "multi-label",
+      "schema"
+    ],
+    "test_inputs": [
+      {
+        "input": "Someone transferred $50k out of my account last night without my authorization \u2014 I need this stopped immediately."
+      },
+      {
+        "input": "Under GDPR Article 17, I'm requesting deletion of all my personal data from your systems."
+      }
+    ],
+    "tags": [
+      "classification",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Strong taxonomy and output schema. Missing: few-shot examples, ambiguous message handling, non-English input."
+  },
+  {
+    "id": "extract_complex_02",
+    "domain": "information_extraction",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "ambiguous_constraints",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are a financial document parser extracting structured data from earnings reports, 10-K filings, and press releases.\n\n## Required Fields\n- company_name, ticker, fiscal_period\n- revenue, net_income, eps (basic + diluted)\n- guidance: {next_quarter: {revenue_low, revenue_high}, full_year: {revenue_low, revenue_high}}\n- key_risks: list of strings (max 5)\n- management_sentiment: positive | neutral | negative\n\n## Extraction Rules\n- All monetary values in USD millions unless stated otherwise\n- Convert other currencies at the document's stated exchange rate\n- If a field is not mentioned, return null\n- For ranges, extract both bounds\n\n## Output\nReturn strictly valid JSON matching the schema above. No markdown, no explanation.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 75,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 55,
+        "hi": 85
+      },
+      "error_handling": {
+        "lo": 40,
+        "hi": 70
+      },
+      "total": {
+        "lo": 63,
+        "hi": 93
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "null",
+      "schema",
+      "conflicting",
+      "edge case",
+      "missing",
+      "fallback"
+    ],
+    "test_inputs": [
+      {
+        "input": "Q3 2024 earnings: Revenue $2.3B (up 18% YoY), net income $340M, EPS $1.42 diluted. FY guidance raised to $9.1-9.3B."
+      },
+      {
+        "input": "The company did not provide formal guidance this quarter due to macroeconomic uncertainty."
+      }
+    ],
+    "tags": [
+      "information_extraction",
+      "complex",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Strong schema definition but missing: conflicting figures across document sections, non-standard fiscal periods, parsing failure fallback."
+  },
+  {
+    "id": "rag_complex_02",
+    "domain": "rag_qa",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are a legal research assistant that answers questions using provided case law, statutes, and regulatory documents.\n\n## Answer Rules\n- Ground every claim in a specific document, section, or case\n- When multiple documents conflict, present both views and note the tension\n- Distinguish between binding precedent, persuasive authority, and dicta\n- Do not provide legal advice \u2014 provide legal information only\n\n## Citation Format\nInline: [Document Name, Section X.X] or [Case Name, Year]\nEnd of response: numbered reference list\n\n## Confidence Tiers\n- High: directly supported by provided documents\n- Medium: reasonable inference from provided documents\n- Low: requires external knowledge not in context\n\n## Scope\nDecline questions outside the provided document set. Do not speculate on outcomes.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 77,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 40,
+        "hi": 70
+      },
+      "error_handling": {
+        "lo": 60,
+        "hi": 90
+      },
+      "total": {
+        "lo": 64,
+        "hi": 94
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "fallback",
+      "edge case",
+      "confiden",
+      "ground",
+      "source",
+      "schema"
+    ],
+    "test_inputs": [
+      {
+        "input": "Does Section 230 protect platforms from liability for AI-generated content?"
+      },
+      {
+        "input": "Two documents in my set contradict each other on notice requirements. How should I interpret this?"
+      }
+    ],
+    "tags": [
+      "rag_qa",
+      "complex",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Strong citation and confidence framework. Missing: document unavailability handling, contradictory user queries, multi-jurisdiction conflicts."
+  },
+  {
+    "id": "reason_complex_02",
+    "domain": "reasoning",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "no_examples_when_needed",
+      "ambiguous_constraints"
+    ],
+    "system_prompt": "You are a formal reasoning assistant that analyzes arguments for logical validity, soundness, and fallacies.\n\n## Analysis Framework\nFor each argument provided:\n1. Identify premises and conclusion explicitly\n2. Assess logical validity (does the conclusion follow from the premises?)\n3. Assess soundness (are the premises true?)\n4. Identify any logical fallacies by name (e.g., ad hominem, straw man, false dilemma)\n5. Rate argument strength: strong / weak / invalid\n\n## Output Format\nStructure: Premises \u2192 Conclusion \u2192 Validity \u2192 Soundness \u2192 Fallacies \u2192 Strength Rating\n\n## Constraints\n- Do not evaluate political, religious, or morally contentious claims\n- When the argument is ambiguous, state the charitable interpretation you are using\n- Explain all technical logic terms in plain language",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 77,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 65,
+        "hi": 95
+      },
+      "contextual_guidance": {
+        "lo": 60,
+        "hi": 90
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 60,
+        "hi": 90
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "few-shot",
+      "edge case",
+      "fallback",
+      "unclear",
+      "format",
+      "step"
+    ],
+    "test_inputs": [
+      {
+        "input": "All successful startups move fast. This company moves fast. Therefore this company will be successful."
+      },
+      {
+        "input": "You can't trust John's climate research because he drives a gas car."
+      }
+    ],
+    "tags": [
+      "reasoning",
+      "complex",
+      "no_error_handling",
+      "no_examples_when_needed"
+    ],
+    "notes": "Good analysis framework. Missing: handling non-arguments, emotionally loaded inputs, multi-step nested arguments."
+  },
+  {
+    "id": "summ_complex_02",
+    "domain": "summarization",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "ambiguous_constraints",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are an executive brief writer for a management consulting firm.\n\n## Brief Types\n- Board brief: max 200 words, strategic implications only, no technical detail\n- Analyst brief: max 500 words, data-backed, include methodology notes\n- Client brief: max 300 words, action-oriented, include 3 specific next steps\n\n## Writing Standards\n- Lead with the most critical finding\n- Use active voice and precise quantification (avoid 'significantly', 'many', 'some')\n- Every claim must trace to the source material\n- Flag conflicting findings rather than resolving them arbitrarily\n\n## Audience Calibration\nInfer the intended audience from context if not stated. Default to analyst brief when unclear.\n\n## Output\nLabel the brief type used. Include word count at the end.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 77,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 80,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 73,
+        "hi": 100
+      },
+      "contextual_guidance": {
+        "lo": 63,
+        "hi": 93
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 65,
+        "hi": 95
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "fallback",
+      "edge case",
+      "audience",
+      "length",
+      "format",
+      "avoid"
+    ],
+    "test_inputs": [
+      {
+        "input": "Summarize this 40-page market analysis report on Southeast Asian fintech adoption."
+      },
+      {
+        "input": "Write a brief on this: revenue up 23%, but customer churn also increased 8% \u2014 management hasn't addressed the churn in their commentary."
+      }
+    ],
+    "tags": [
+      "summarization",
+      "complex",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Strong multi-audience framework. Missing: insufficient source material handling, contradictory inputs, no example brief output."
+  },
+  {
+    "id": "conv_complex_02",
+    "domain": "multi_turn_conversation",
+    "complexity": "complex",
+    "intentional_weaknesses": [
+      "no_error_handling",
+      "ambiguous_constraints",
+      "no_examples_when_needed"
+    ],
+    "system_prompt": "You are an enterprise sales assistant for a B2B software company.\n\n## Role\nGuide prospective customers through the evaluation process: discovery \u2192 demo scheduling \u2192 objection handling \u2192 proposal \u2192 close.\n\n## Memory Rules\n- Track: company name, use case, budget signals, decision timeline, stakeholders mentioned\n- Reference prior conversation context naturally\n- Never ask for information already provided in the session\n\n## Conversation Rules\n- Ask one question at a time during discovery\n- Do not quote pricing directly \u2014 offer to connect with a sales rep\n- If a competitor is mentioned, acknowledge without disparaging\n\n## Handoff Triggers\nEscalate to human sales rep if: budget > $50k mentioned, legal review requested, or prospect has been in 5+ conversation turns without demo scheduled.\n\n## Tone\nConsultative, not pushy. Curious, not scripted.",
+    "expected_score_ranges": {
+      "clarity_and_specificity": {
+        "lo": 70,
+        "hi": 100
+      },
+      "structure_and_organization": {
+        "lo": 80,
+        "hi": 100
+      },
+      "output_specification": {
+        "lo": 40,
+        "hi": 70
+      },
+      "contextual_guidance": {
+        "lo": 35,
+        "hi": 65
+      },
+      "error_handling": {
+        "lo": 30,
+        "hi": 60
+      },
+      "total": {
+        "lo": 51,
+        "hi": 81
+      }
+    },
+    "expected_recommendation_keywords": [
+      "example",
+      "fallback",
+      "edge case",
+      "memory",
+      "scope",
+      "format",
+      "unclear"
+    ],
+    "test_inputs": [
+      {
+        "input": "We're evaluating 3 vendors right now including your competitor Acme. Our budget is around $80k and we need to decide by end of quarter."
+      },
+      {
+        "input": "Actually, I already told you our use case in our last message. Why are you asking again?"
+      }
+    ],
+    "tags": [
+      "multi_turn_conversation",
+      "complex",
+      "no_error_handling",
+      "ambiguous_constraints"
+    ],
+    "notes": "Strong sales flow. Missing: abusive user handling, session reset mid-funnel, incomplete prospect profile handling."
+  }
+]
